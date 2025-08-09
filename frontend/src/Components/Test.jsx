@@ -200,11 +200,15 @@ export default function Test() {
     setIsSubmitting(true);
     try {
       const resumeText = localStorage.getItem("resumeText");
-      const res = await fetch("http://localhost:5000/api/user/evaluate-test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resumeText, questions, answers: temp }),
-      });
+    const res = await fetch("http://localhost:5000/api/user/evaluate-test", {
+  method: "POST",
+  headers: { 
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}` // ✅ add token here
+  },
+  body: JSON.stringify({ resumeText, questions, answers: temp }),
+});
+
       const data = await res.json();
       if (data.score !== undefined) setScore(data.score);
       if (data.details) setResultDetails(data.details);

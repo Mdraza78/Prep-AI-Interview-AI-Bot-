@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const TestResult = require('../models/TestResult');
 const fetch = require('node-fetch');
 
 const multer = require('multer');
@@ -159,7 +160,7 @@ router.post('/login', async (req, res) => {
 
 // Evaluate test route
 // Evaluate test route - AI powered
-router.post('/evaluate-test', async (req, res) => {
+router.post('/evaluate-test', authenticateToken, async (req, res) => {
   try {
     const { resumeText, questions, answers } = req.body;
     if (!resumeText || !questions || !answers) {
@@ -168,6 +169,7 @@ router.post('/evaluate-test', async (req, res) => {
 
     let totalScore = 0;
     let details = [];
+    const userId = req.user.userId; // from JWT
 
     for (let i = 0; i < questions.length; i++) {
       const question = questions[i];
@@ -192,20 +194,26 @@ Second line: A short constructive feedback on how to improve.
 `;
 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
-      const body = {
-        contents: [{ parts: [{ text: prompt }] }]
-      };
+      const body = { contents: [{ parts: [{ text: prompt }] }] };
 
       const aiRes = await fetch(url, {
-        method: 'POST',
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       });
 
-      const aiData = await aiRes.json();
-      let aiText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "0";
+      if (!aiRes.ok) {
+        const errorData = await aiRes.json();
+        console.error("Gemini API error:", errorData);
+        return res.status(500).json({ error: "AI evaluation failed" });
+      }
 
-      // Split score and feedback
+      const aiData = await aiRes.json();
+      console.log("🔍 AI Raw Response:", JSON.stringify(aiData, null, 2));
+
+      let aiText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (!aiText) aiText = "0\nNo feedback provided.";
+
       let [scoreLine, ...feedbackLines] = aiText.split("\n");
       let numericScore = parseInt(scoreLine.trim(), 10);
       if (isNaN(numericScore)) numericScore = 0;
@@ -216,17 +224,21 @@ Second line: A short constructive feedback on how to improve.
         question,
         answer,
         individualScore: numericScore,
-        feedback: feedbackLines.join(" ").trim()
+        feedback: feedbackLines.join(" ").trim(),
       });
     }
+
+    // ✅ Save to DB
+    await TestResult.create({ userId, totalScore, questions: details });
 
     res.json({ score: totalScore, details });
 
   } catch (err) {
-    console.error('Failed to evaluate test via AI:', err);
-    res.status(500).json({ error: 'Failed to evaluate test.' });
+    console.error("❌ Failed to evaluate test via AI:", err);
+    res.status(500).json({ error: "Failed to evaluate test." });
   }
 });
+
 
 
 
