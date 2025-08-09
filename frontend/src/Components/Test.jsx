@@ -3,7 +3,7 @@ import { Bot, Mic, MicOff, Volume2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const BORDER_COLOR = "#238636"; // lighter green (Tailwind green-700)
-
+const token = localStorage.getItem("token"); // token from login
 // Component to render question text with code blocks
 function QuestionDisplay({ question }) {
   // Correct regex for triple backticks
@@ -277,7 +277,7 @@ export default function Test() {
                         Your answer:{" "}
                         <span className="text-green-200">{item.answer}</span>
                       </div>
-                      <div className="mb-2">
+                      <div className="mb-2 text-white font-bold">
                         Score:{" "}
                         <span className="text-green-400 font-semibold">
                           {item.individualScore} / 20
@@ -342,11 +342,10 @@ export default function Test() {
                   </span>
                 )}
               </div>
-
               <div className="mb-2">
                 {currentIndex < 4 ? (
                   <>
-                  <br />
+                  
                     <div className="flex justify-center mb-2">
                       <button
                         onClick={isRecording ? stopRecording : startRecording}
@@ -358,6 +357,7 @@ export default function Test() {
                         {isRecording ? "Stop Recording" : "Answer Using Voice"}
                       </button>
                     </div>
+                    <br />
                     <textarea
                       readOnly
                       rows={4}

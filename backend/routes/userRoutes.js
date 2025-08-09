@@ -167,8 +167,8 @@ router.post('/evaluate-test', async (req, res) => {
     }
 
     let totalScore = 0;
+    let details = [];
 
-    // Loop over all Q&A pairs
     for (let i = 0; i < questions.length; i++) {
       const question = questions[i];
       const answer = answers[i] || "No answer given";
@@ -187,15 +187,13 @@ Score this answer from 0 to 20 based on:
 3. Clarity of explanation
 4. Relevance to the question
 
-Respond ONLY with a number between 0 and 20 (no text or explanation).
-      `;
+First line: ONLY the score (number between 0 and 20)
+Second line: A short constructive feedback on how to improve.
+`;
 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
-      
       const body = {
-        contents: [
-          { parts: [{ text: prompt }] }
-        ]
+        contents: [{ parts: [{ text: prompt }] }]
       };
 
       const aiRes = await fetch(url, {
@@ -205,25 +203,31 @@ Respond ONLY with a number between 0 and 20 (no text or explanation).
       });
 
       const aiData = await aiRes.json();
+      let aiText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "0";
 
-      // Extract AI response text and try to parse number
-      let scoreText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "0";
-      let numericScore = parseInt(scoreText, 10);
-
-      // Fallback if AI outputs something unexpected
+      // Split score and feedback
+      let [scoreLine, ...feedbackLines] = aiText.split("\n");
+      let numericScore = parseInt(scoreLine.trim(), 10);
       if (isNaN(numericScore)) numericScore = 0;
 
       totalScore += numericScore;
+
+      details.push({
+        question,
+        answer,
+        individualScore: numericScore,
+        feedback: feedbackLines.join(" ").trim()
+      });
     }
 
-    // Send total score back
-    res.json({ score: totalScore });
+    res.json({ score: totalScore, details });
 
   } catch (err) {
     console.error('Failed to evaluate test via AI:', err);
     res.status(500).json({ error: 'Failed to evaluate test.' });
   }
 });
+
 
 
 // PATCH /profile to update user data
