@@ -152,7 +152,16 @@ router.post('/login', async (req, res) => {
       { expiresIn: '2h' }
     );
 
-    res.json({ token, name: user.name, email: user.email, phone: user.phone, bio: user.bio, skills: user.skills });
+    // Return userId explicitly here
+    res.json({
+      token,
+      userId: user._id.toString(), // add this line
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      bio: user.bio,
+      skills: user.skills
+    });
   } catch (err) {
     res.status(500).json({ error: 'Login failed' });
   }
@@ -239,6 +248,63 @@ Second line: A short constructive feedback on how to improve.
   }
 });
 
+// Add after other routes, before module.exports
+router.get('/results', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const results = await TestResult.find({ userId })
+      .sort({ createdAt: -1 }); // most recent first
+
+    res.json({ results });
+  } catch (err) {
+    console.error('Failed to fetch user results:', err);
+    res.status(500).json({ error: 'Could not fetch results' });
+  }
+});
+
+// Leaderboard API: GET /api/user/leaderboard
+// Leaderboard API: GET /api/user/leaderboard
+router.get('/leaderboard', async (req, res) => {
+  try {
+    const results = await TestResult.aggregate([
+      {
+        $group: {
+          _id: "$userId",
+          totalPoints: { $sum: "$totalScore" },
+          attempts: { $sum: 1 },                        // ✅ Count attempts
+          averageScore: { $avg: "$totalScore" },        // ✅ Average score
+          bestScore: { $max: "$totalScore" }            // ✅ Best score
+        }
+      },
+      { $sort: { totalPoints: -1 } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "user"
+        }
+      },
+      { $unwind: "$user" },
+      {
+        $project: {
+          _id: 0,
+          userId: "$user._id",
+          name: "$user.name",
+          totalPoints: 1,
+          attempts: 1,
+          bestScore: 1,
+          averageScore: { $round: ["$averageScore", 2] } // Rounds average
+        }
+      },
+      { $limit: 100 }
+    ]);
+    res.json({ leaderboard: results });
+  } catch (err) {
+    console.error("Error creating leaderboard:", err);
+    res.status(500).json({ error: "Failed to load leaderboard" });
+  }
+});
 
 
 

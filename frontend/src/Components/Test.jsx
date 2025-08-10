@@ -3,7 +3,7 @@ import { Bot, Mic, MicOff, Volume2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const BORDER_COLOR = "#238636"; // lighter green (Tailwind green-700)
-const token = localStorage.getItem("token"); // token from login
+
 // Component to render question text with code blocks
 function QuestionDisplay({ question }) {
   // Correct regex for triple backticks
@@ -66,7 +66,7 @@ export default function Test() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [score, setScore] = useState(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [resultDetails, setResultDetails] = useState([]); // Optional feedback
+  const [resultDetails, setResultDetails] = useState([]);
 
   const userName = localStorage.getItem("name") || "User";
   const navigate = useNavigate();
@@ -76,17 +76,32 @@ export default function Test() {
     async function fetchQuestions() {
       setIsLoadingQuestions(true);
       try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          navigate('/login');
+          return;
+        }
+
         const resumeText = localStorage.getItem("resumeText");
         if (!resumeText) {
           alert("No resume text found. Please upload your resume first.");
-          navigate("/");
+          navigate("/dashboard");
           return;
         }
+
         const res = await fetch("http://localhost:5000/api/user/start-interview", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
           body: JSON.stringify({ resumeText }),
         });
+
+        if (!res.ok) {
+          throw new Error('Failed to fetch questions');
+        }
+
         const data = await res.json();
         if (data.questions && data.questions.length === 5) {
           setQuestions(data.questions);
@@ -96,15 +111,15 @@ export default function Test() {
         } else {
           alert("Unexpected number of questions received. Expected 5.");
         }
-      } catch {
+      } catch (err) {
+        console.error("Error fetching questions:", err);
         alert("Error fetching questions!");
       } finally {
         setIsLoadingQuestions(false);
       }
     }
     fetchQuestions();
-    // eslint-disable-next-line
-  }, []);
+  }, [navigate]);
 
   function speakText(text) {
     if (!("speechSynthesis" in window)) return;
@@ -189,31 +204,47 @@ export default function Test() {
   };
 
   const handleEndTest = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
     const trimmed = answerInput.trim();
     if (!trimmed) {
       alert("Please provide an answer before ending the test.");
       return;
     }
+
     const temp = [...answers];
     temp[currentIndex] = trimmed;
     setAnswers(temp);
     setIsSubmitting(true);
+
     try {
       const resumeText = localStorage.getItem("resumeText");
-    const res = await fetch("http://localhost:5000/api/user/evaluate-test", {
-  method: "POST",
-  headers: { 
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${token}` // ✅ add token here
-  },
-  body: JSON.stringify({ resumeText, questions, answers: temp }),
-});
+      const res = await fetch("http://localhost:5000/api/user/evaluate-test", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          resumeText, 
+          questions, 
+          answers: temp 
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Evaluation failed');
+      }
 
       const data = await res.json();
-      if (data.score !== undefined) setScore(data.score);
-      if (data.details) setResultDetails(data.details);
-      else setResultDetails([]);
-    } catch {
+      setScore(data.score);
+      setResultDetails(data.details || []);
+    } catch (err) {
+      console.error("Error submitting test:", err);
       alert("Error submitting test.");
     } finally {
       setIsSubmitting(false);
@@ -349,7 +380,6 @@ export default function Test() {
               <div className="mb-2">
                 {currentIndex < 4 ? (
                   <>
-                  
                     <div className="flex justify-center mb-2">
                       <button
                         onClick={isRecording ? stopRecording : startRecording}

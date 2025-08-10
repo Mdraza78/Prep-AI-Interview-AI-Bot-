@@ -3,24 +3,35 @@ import React, { useEffect, useState, useRef } from "react";
 const BIO_WORD_LIMIT = 20;
 
 export default function UserProfile() {
-  // Profile state includes image preview and selected file
+  // Animation helper (same as ScoresList)
+  const fadeSlideInStyle = (delay) => ({
+    animationName: "fadeSlideIn",
+    animationDuration: "0.7s",
+    animationTimingFunction: "ease-out",
+    animationFillMode: "forwards",
+    animationDelay: delay,
+    opacity: 0,
+    transform: "translateY(1rem)",
+  });
+
   const [profile, setProfile] = useState({
     name: "",
     email: "",
     phone: "",
     bio: "",
     skills: "",
-    imageUrl: "", // URL or base64 preview of profile image
-    imageFile: null, // file selected for upload
+    imageUrl: "",
+    imageFile: null,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [editMode, setEditMode] = useState(false);
-  const token = localStorage.getItem("token");
 
-  const bioWordCount = profile.bio.trim() === "" ? 0 : profile.bio.trim().split(/\s+/).length;
+  const token = localStorage.getItem("token");
+  const bioWordCount =
+    profile.bio.trim() === "" ? 0 : profile.bio.trim().split(/\s+/).length;
 
   useEffect(() => {
     if (!token) {
@@ -44,7 +55,9 @@ export default function UserProfile() {
           email: data.email || "",
           phone: data.phone || "",
           bio: data.bio || "",
-          skills: Array.isArray(data.skills) ? data.skills.join(", ") : data.skills || "",
+          skills: Array.isArray(data.skills)
+            ? data.skills.join(", ")
+            : data.skills || "",
           imageUrl: data.imageUrl || "",
           imageFile: null,
         });
@@ -112,9 +125,6 @@ export default function UserProfile() {
         imageUrl: profile.imageUrl,
       };
 
-      // TODO: If image uploading is supported separately, handle that here:
-      // e.g., upload profile.imageFile with FormData, then update imageUrl from response
-
       const res = await fetch("http://localhost:5000/api/user/profile", {
         method: "PATCH",
         headers: {
@@ -140,11 +150,15 @@ export default function UserProfile() {
   };
 
   if (loading)
-    return <div className="text-center py-8 text-green-500">Loading profile...</div>;
+    return (
+      <div className="text-center py-8 text-green-500">Loading profile...</div>
+    );
   if (error)
-    return <div className="text-center py-8 text-red-600">Error: {error}</div>;
+    return (
+      <div className="text-center py-8 text-red-600">Error: {error}</div>
+    );
 
-  // ProfilePictureCard nested component
+  // Profile Picture Sub-component
   function ProfilePictureCard({ profileImage, onSelectImage }) {
     const fileInputRef = useRef(null);
     const [preview, setPreview] = useState(profileImage || "");
@@ -168,7 +182,10 @@ export default function UserProfile() {
     };
 
     return (
-      <div className="rounded-lg shadow-md p-4 border border-[#2D3748] bg-[#222B3A] text-white">
+      <div
+        style={fadeSlideInStyle("0.1s")}
+        className="rounded-lg shadow-md p-4 border border-[#2D3748] bg-[#222B3A] text-white"
+      >
         <div className="mb-3">
           <h2 className="text-xl font-semibold">Profile Picture</h2>
           <span className="text-sm text-gray-400">Update your profile photo</span>
@@ -183,51 +200,22 @@ export default function UserProfile() {
                   className="object-cover w-full h-full"
                 />
               ) : (
-                <span className="text-[#c1c9d6] text-2xl">
-                  <svg
-                    height={34}
-                    width={34}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <circle cx={12} cy={8} r={4} fill="#b7bbc0" />
-                    <path
-                      d="M4.77 19.4C6.37 16.8 9 15 12 15s5.63 1.8 7.23 4.4"
-                      stroke="#b7bbc0"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </span>
+                <span className="text-[#c1c9d6] text-2xl">👤</span>
               )}
             </div>
-
             <button
               type="button"
               aria-label="Change photo"
               className="absolute -bottom-1 -left-1 bg-green-600 text-white rounded-full border-4 border-[#222B3A] p-1 hover:bg-green-700 transition"
               onClick={() => fileInputRef.current.click()}
-              tabIndex={0}
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M14.828 5.828a4 4 0 0 0-5.656 0L5.414 9.586A2 2 0 0 0 5 11.414V17a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5.586a2 2 0 0 0-.586-1.414l-3.758-3.758z"></path>
-                <path d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"></path>
-              </svg>
+              📷
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/jpg,image/gif"
                 className="hidden"
                 ref={fileInputRef}
                 onChange={handleImageChange}
-                tabIndex={-1}
               />
             </button>
           </div>
@@ -240,7 +228,9 @@ export default function UserProfile() {
             >
               Change Photo
             </button>
-            <div className="text-xs text-gray-400">JPG, PNG or GIF. Max size 2MB.</div>
+            <div className="text-xs text-gray-400">
+              JPG, PNG or GIF. Max size 2MB.
+            </div>
           </div>
         </div>
       </div>
@@ -249,50 +239,43 @@ export default function UserProfile() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 min-h-screen">
-     {successMsg && (
-  <div className="mb-4 flex items-center justify-between p-4 rounded-lg bg-green-600 text-white shadow relative animate-fade-in">
-    <div className="flex items-center gap-2">
-      {/* Check Circle Icon */}
-      <svg
-        className="w-6 h-6 text-white flex-shrink-0"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.5}
-        viewBox="0 0 24 24"
-      >
-        <circle cx={12} cy={12} r={11} stroke="currentColor" strokeWidth={2.5} fill="none" />
-        <path d="M7 13l3 3 7-7" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-      <span className="font-semibold">{successMsg}</span>
-    </div>
-    {/* X Dismiss Button */}
-    <button
-      onClick={() => setSuccessMsg(null)}
-      className="w-6 h-6 flex items-center justify-center rounded hover:bg-green-700 focus:outline-none transition"
-      aria-label="Dismiss"
-      type="button"
-    >
-      <svg
-        className="w-5 h-5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.5}
-        viewBox="0 0 24 24"
-      >
-        <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" />
-      </svg>
-    </button>
-  </div>
-)}
+      <style>{`
+        @keyframes fadeSlideIn {
+          0% { opacity: 0; transform: translateY(1rem); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
+      {successMsg && (
+        <div
+          style={fadeSlideInStyle("0.05s")}
+          className="mb-4 flex items-center justify-between p-4 rounded-lg bg-green-600 text-white shadow relative"
+        >
+          <span className="font-semibold">{successMsg}</span>
+          <button onClick={() => setSuccessMsg(null)}>✖</button>
+        </div>
+      )}
 
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-center">{error}</div>
+        <div
+          style={fadeSlideInStyle("0.05s")}
+          className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-center"
+        >
+          {error}
+        </div>
       )}
 
       <div className="flex flex-col gap-6">
-        <ProfilePictureCard profileImage={profile.imageUrl} onSelectImage={handleSelectImage} />
+        {/* Profile Picture */}
+        <ProfilePictureCard
+          profileImage={profile.imageUrl}
+          onSelectImage={handleSelectImage}
+        />
 
-        <div className="rounded-lg shadow-md p-6 border border-[#2D3748] bg-[#222B3A] text-white">
+        <div
+          style={fadeSlideInStyle("0.2s")}
+          className="rounded-lg shadow-md p-6 border border-[#2D3748] bg-[#222B3A] text-white"
+        >
           <div className="flex justify-between items-center mb-4">
             <div>
               <h2 className="text-xl font-semibold">Personal Information</h2>
@@ -327,9 +310,10 @@ export default function UserProfile() {
           </div>
 
           <div className="space-y-4 mt-6">
+            {/* EDIT MODE: (you can add animation to each field like below if you want) */}
             {editMode ? (
               <>
-                <div>
+                <div style={fadeSlideInStyle("0.25s")}>
                   <label className="block text-sm font-medium mb-1 text-gray-300">First Name</label>
                   <input
                     type="text"
@@ -337,14 +321,16 @@ export default function UserProfile() {
                     onChange={(e) =>
                       setProfile({
                         ...profile,
-                        name: e.target.value + " " + (profile.name.split(" ")[1] || ""),
+                        name:
+                          e.target.value +
+                          " " +
+                          (profile.name.split(" ")[1] || ""),
                       })
                     }
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white"
                   />
                 </div>
-
-                <div>
+                <div style={fadeSlideInStyle("0.3s")}>
                   <label className="block text-sm font-medium mb-1 text-gray-300">Last Name</label>
                   <input
                     type="text"
@@ -352,14 +338,16 @@ export default function UserProfile() {
                     onChange={(e) =>
                       setProfile({
                         ...profile,
-                        name: (profile.name.split(" ")[0] || "") + " " + e.target.value,
+                        name:
+                          (profile.name.split(" ")[0] || "") +
+                          " " +
+                          e.target.value,
                       })
                     }
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white"
                   />
                 </div>
-
-                <div>
+                <div style={fadeSlideInStyle("0.35s")}>
                   <label className="block text-sm font-medium mb-1 text-gray-300">Email</label>
                   <input
                     type="email"
@@ -368,30 +356,29 @@ export default function UserProfile() {
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-400 cursor-not-allowed"
                   />
                 </div>
-
-                <div>
+                <div style={fadeSlideInStyle("0.4s")}>
                   <label className="block text-sm font-medium mb-1 text-gray-300">Phone Number</label>
                   <input
                     type="tel"
                     value={profile.phone}
                     onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-300">Skills (comma separated)</label>
+                <div style={fadeSlideInStyle("0.45s")}>
+                  <label className="block text-sm font-medium mb-1 text-gray-300">
+                    Skills (comma separated)
+                  </label>
                   <input
                     type="text"
                     name="skills"
                     value={profile.skills}
                     onChange={handleChange}
                     placeholder="e.g. JavaScript, React, Node.js"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white"
                   />
                 </div>
-
-                <div>
+                <div style={fadeSlideInStyle("0.5s")}>
                   <label className="block text-sm font-medium mb-1 text-gray-300">
                     Bio (max {BIO_WORD_LIMIT} words)
                   </label>
@@ -404,7 +391,7 @@ export default function UserProfile() {
                       }
                     }}
                     rows={3}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white"
                   />
                   <p className="text-xs text-gray-400 text-right mt-1">
                     {bioWordCount}/{BIO_WORD_LIMIT} words
@@ -413,43 +400,56 @@ export default function UserProfile() {
               </>
             ) : (
               <>
-                <div>
-                  <p className="text-sm font-medium mb-1 text-gray-300">First Name</p>
+                {/* READ-ONLY FIELDS WITH ANIMATION */}
+                <div style={fadeSlideInStyle("0.25s")}>
+                  <p className="text-sm font-medium mb-1 text-gray-300">
+                    First Name
+                  </p>
                   <div className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white">
                     {profile.name.split(" ")[0] || "-"}
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium mb-1 text-gray-300">Last Name</p>
+                <div style={fadeSlideInStyle("0.3s")}>
+                  <p className="text-sm font-medium mb-1 text-gray-300">
+                    Last Name
+                  </p>
                   <div className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white">
                     {profile.name.split(" ")[1] || "-"}
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium mb-1 text-gray-300">Email</p>
+                <div style={fadeSlideInStyle("0.35s")}>
+                  <p className="text-sm font-medium mb-1 text-gray-300">
+                    Email
+                  </p>
                   <div className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white">
                     {profile.email || "-"}
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium mb-1 text-gray-300">Phone Number</p>
+                <div style={fadeSlideInStyle("0.4s")}>
+                  <p className="text-sm font-medium mb-1 text-gray-300">
+                    Phone Number
+                  </p>
                   <div className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white">
                     {profile.phone || "-"}
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium mb-1 text-gray-300">Skills</p>
+                <div style={fadeSlideInStyle("0.45s")}>
+                  <p className="text-sm font-medium mb-1 text-gray-300">
+                    Skills
+                  </p>
                   <div className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white min-h-[40px]">
                     {profile.skills || "-"}
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium mb-1 text-gray-300">Bio (max {BIO_WORD_LIMIT} words)</p>
+                <div style={fadeSlideInStyle("0.5s")}>
+                  <p className="text-sm font-medium mb-1 text-gray-300">
+                    Bio (max {BIO_WORD_LIMIT} words)
+                  </p>
                   <div className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white min-h-[60px] whitespace-pre-line">
                     {profile.bio || "-"}
                   </div>

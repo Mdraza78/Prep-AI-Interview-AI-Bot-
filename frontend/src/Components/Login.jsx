@@ -23,26 +23,33 @@ export default function Login({ onLoginSuccess }) {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setMsg('');
-    setLoading(true);
+ // In your Login.jsx handleSubmit function:
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError('');
+  setMsg('');
+  setLoading(true);
 
-    try {
-      const res = await axios.post('http://localhost:5000/api/user/login', form);
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('name', res.data.name);
-      setMsg('Login successful!');
-      if (onLoginSuccess) onLoginSuccess(res.data.name);
-      // Redirect to dashboard page after successful login
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const res = await axios.post('http://localhost:5000/api/user/login', form);
+    // Clear any existing data first
+    localStorage.clear();
+    
+    // Store new data
+    localStorage.setItem('token', res.data.token);
+    localStorage.setItem('userId', res.data.userId);
+    localStorage.setItem('name', res.data.name);
+    
+    setMsg('Login successful!');
+    if (onLoginSuccess) onLoginSuccess(res.data.name);
+    navigate('/dashboard');
+  } catch (err) {
+    setError(err.response?.data?.error || 'Login failed');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
