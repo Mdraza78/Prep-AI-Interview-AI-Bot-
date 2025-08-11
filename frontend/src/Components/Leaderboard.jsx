@@ -19,7 +19,7 @@ export default function Leaderboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const usersPerPage = 5;
 
-  const currentUserId = localStorage.getItem("userId"); // stored at login
+  const currentUserId = localStorage.getItem("userId");
 
   useEffect(() => {
     fetch("http://localhost:5000/api/user/leaderboard")
@@ -45,7 +45,7 @@ export default function Leaderboard() {
         }
       `}</style>
 
-      {/* heading */}
+      {/* Heading */}
       <div style={fadeSlideInStyle("0.1s")} className="mb-10">
         <h2 className="text-3xl font-semibold text-white text-center mb-1">
           <FontAwesomeIcon icon={faRankingStar} className="text-green-400 mr-2" />
@@ -59,13 +59,13 @@ export default function Leaderboard() {
       {/* Table container */}
       <div className="shadow-lg rounded-xl border border-gray-800 bg-[#1b2232] overflow-hidden">
         {/* Header row */}
-        <div className="grid grid-cols-12 px-7 py-3 border-b border-gray-800 gap-2">
+        <div className="grid grid-cols-12 px-7 py-3 border-b border-gray-800 gap-2 text-center">
           <span className="col-span-2 text-sm text-gray-400 font-semibold">Rank</span>
           <span className="col-span-3 text-sm text-gray-400 font-semibold">Name</span>
-          <span className="col-span-2 text-sm text-gray-400 font-semibold text-center">Total Attempts</span>
-          <span className="col-span-1 text-sm text-gray-400 font-semibold text-center">Best Score</span>
-          <span className="col-span-2 text-sm text-gray-400 font-semibold text-center">Avg Score</span>
-          <span className="col-span-2 text-sm text-gray-400 font-semibold text-right">Total Points</span>
+          <span className="col-span-2 text-sm text-gray-400 font-semibold">Total Attempts</span>
+          <span className="col-span-1 text-sm text-gray-400 font-semibold">Best Score</span>
+          <span className="col-span-2 text-sm text-gray-400 font-semibold">Avg Score</span>
+          <span className="col-span-2 text-sm text-gray-400 font-semibold">Total Points</span>
         </div>
 
         {/* Body */}
@@ -91,21 +91,21 @@ export default function Leaderboard() {
               <div
                 key={entry.userId}
                 style={fadeSlideInStyle(`${0.2 + idx * 0.07}s`)}
-                className={`grid grid-cols-12 items-center px-7 py-4 border-b border-gray-700
+                className={`grid grid-cols-12 items-center px-7 py-4 border-b border-gray-700 text-center
                   ${(startIndex + idx) < 3 ? "bg-[#232e3f]/50" : ""} 
                   ${isCurrentUser ? "border-green-500 border-2" : ""}`}
               >
                 {/* Rank col */}
-                <div className="col-span-2 flex items-center">
+                <div className="col-span-2 flex justify-center items-center">
                   {(startIndex + idx) < 3 ? (
                     <FontAwesomeIcon icon={faMedal} className={medalColor} size="2x" />
                   ) : (
-                    <span className="text-white font-bold text-lg">{startIndex + idx + 1}</span>
+                    <span className="text-white font-medium text-lg">{startIndex + idx + 1}</span>
                   )}
                 </div>
 
                 {/* Name */}
-                <div className="col-span-3 flex items-center gap-2">
+                <div className="col-span-3 flex justify-center items-center gap-2">
                   <span className="text-white font-medium truncate">{entry.name}</span>
                   {isCurrentUser && (
                     <span className="bg-green-600 text-white text-xs font-semibold px-2 py-0.5 rounded">
@@ -115,22 +115,22 @@ export default function Leaderboard() {
                 </div>
 
                 {/* Attempts */}
-                <div className="col-span-2 text-center text-white font-semibold whitespace-nowrap">
+                <div className="col-span-2 text-white font-normal whitespace-nowrap">
                   {entry.attempts}
                 </div>
 
                 {/* Best Score */}
-                <div className="col-span-1 text-center text-white font-bold whitespace-nowrap">
+                <div className="col-span-1 text-white font-normal whitespace-nowrap">
                   {entry.bestScore}
                 </div>
 
                 {/* Average Score */}
-                <div className="col-span-2 text-center text-white font-bold whitespace-nowrap">
+                <div className="col-span-2 text-white font-normal whitespace-nowrap">
                   {entry.averageScore}
                 </div>
 
                 {/* Total Points */}
-                <div className="col-span-2 text-white font-bold text-right whitespace-nowrap">
+                <div className="col-span-2 text-white font-normal whitespace-nowrap">
                   {entry.totalPoints}
                 </div>
               </div>

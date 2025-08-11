@@ -1,34 +1,33 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Bot, Mic, MicOff, Volume2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const BORDER_COLOR = "#238636"; // lighter green (Tailwind green-700)
+const BORDER_COLOR = "#238636";
 
-// Component to render question text with code blocks
 function QuestionDisplay({ question }) {
-  // Correct regex for triple backticks
+  // FIXED: Code block regex and rendering logic
+  // Regex matches `````` sections and splits normal text vs code
   const codeBlockRegex = /``````/g;
-  const nodes = [];
-  let lastIndex = 0;
-  let match;
-  let key = 0;
+  const parts = [];
+  let lastIndex = 0, match, key = 0;
 
   while ((match = codeBlockRegex.exec(question)) !== null) {
-    const matchIndex = match.index;
-    if (matchIndex > lastIndex) {
-      const textBefore = question.slice(lastIndex, matchIndex).trim();
-      if (textBefore) {
-        nodes.push(
+    // Text before code
+    if (match.index > lastIndex) {
+      const text = question.slice(lastIndex, match.index);
+      if (text.trim()) {
+        parts.push(
           <div key={`text-${key++}`} className="mb-2 text-base text-white whitespace-pre-wrap">
-            {textBefore}
+            {text.trim()}
           </div>
         );
       }
     }
+    // Code block
     const codeContent = match[1];
-    nodes.push(
+    parts.push(
       <div
-        key={`code-block-${key++}`}
+        key={`code-${key++}`}
         className="my-4 rounded-xl bg-[#191f26] border-2 border-green-700 shadow-lg max-w-full overflow-auto"
       >
         <pre className="px-5 py-4 text-sm leading-snug text-green-100 font-mono whitespace-pre">
@@ -36,24 +35,23 @@ function QuestionDisplay({ question }) {
         </pre>
       </div>
     );
-    lastIndex = matchIndex + match[0].length;
+    lastIndex = match.index + match[0].length;
   }
-
+  // Remaining text after last code block
   if (lastIndex < question.length) {
-    const textAfter = question.slice(lastIndex).trim();
-    if (textAfter) {
-      nodes.push(
+    const text = question.slice(lastIndex);
+    if (text.trim()) {
+      parts.push(
         <div key={`text-end`} className="mt-1 text-base text-white whitespace-pre-wrap">
-          {textAfter}
+          {text.trim()}
         </div>
       );
     }
   }
-
-  if (nodes.length === 0) {
+  if (parts.length === 0) {
     return <div className="text-base text-white whitespace-pre-wrap">{question}</div>;
   }
-  return <>{nodes}</>;
+  return <>{parts}</>;
 }
 
 export default function Test() {
@@ -72,6 +70,7 @@ export default function Test() {
   const navigate = useNavigate();
   const recognitionRef = useRef(null);
 
+  // Handles auto-redirect if not logged in or no resumeText
   useEffect(() => {
     async function fetchQuestions() {
       setIsLoadingQuestions(true);
@@ -81,14 +80,12 @@ export default function Test() {
           navigate('/login');
           return;
         }
-
         const resumeText = localStorage.getItem("resumeText");
         if (!resumeText) {
           alert("No resume text found. Please upload your resume first.");
           navigate("/dashboard");
           return;
         }
-
         const res = await fetch("http://localhost:5000/api/user/start-interview", {
           method: "POST",
           headers: { 
@@ -97,11 +94,9 @@ export default function Test() {
           },
           body: JSON.stringify({ resumeText }),
         });
-
         if (!res.ok) {
           throw new Error('Failed to fetch questions');
         }
-
         const data = await res.json();
         if (data.questions && data.questions.length === 5) {
           setQuestions(data.questions);
@@ -119,6 +114,7 @@ export default function Test() {
       }
     }
     fetchQuestions();
+    // eslint-disable-next-line
   }, [navigate]);
 
   function speakText(text) {
@@ -137,32 +133,45 @@ export default function Test() {
       alert("For the coding question, please type your answer.");
       return;
     }
-    if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
+    // Use browser compatibility check, print error if not available
+    let SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
       alert("Your browser does not support voice input.");
       return;
     }
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = true;
-    recognition.continuous = false;
-    recognition.onstart = () => setIsRecording(true);
-    recognition.onresult = (event) => {
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript || "";
-      }
-      setAnswerInput(transcript || "");
-    };
-    recognition.onerror = (event) => {
-      alert(`Speech recognition error: ${event.error}`);
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.continuous = false;
+      recognition.onstart = () => setIsRecording(true);
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript || "";
+        }
+        setAnswerInput(transcript || "");
+      };
+      recognition.onerror = (event) => {
+        setIsRecording(false);
+        recognition.stop();
+        // Print error type
+        console.error("[SpeechRecognition error]", event.error);
+        if (event.error === 'not-allowed') {
+          alert('Microphone permission denied. Please allow access in your browser.');
+        } else if (event.error === 'no-speech') {
+          alert('No speech detected. Try speaking clearly into your microphone.');
+        } else {
+          alert(`Speech recognition error: ${event.error}`);
+        }
+      };
+      recognition.onend = () => setIsRecording(false);
+      recognition.start();
+      recognitionRef.current = recognition;
+    } catch (e) {
       setIsRecording(false);
-      recognition.stop();
-    };
-    recognition.onend = () => setIsRecording(false);
-    recognition.start();
-    recognitionRef.current = recognition;
+      alert("Error starting voice recognition.");
+    }
   };
 
   const stopRecording = () => {
@@ -209,18 +218,15 @@ export default function Test() {
       navigate('/login');
       return;
     }
-
     const trimmed = answerInput.trim();
     if (!trimmed) {
       alert("Please provide an answer before ending the test.");
       return;
     }
-
     const temp = [...answers];
     temp[currentIndex] = trimmed;
     setAnswers(temp);
     setIsSubmitting(true);
-
     try {
       const resumeText = localStorage.getItem("resumeText");
       const res = await fetch("http://localhost:5000/api/user/evaluate-test", {
@@ -235,11 +241,9 @@ export default function Test() {
           answers: temp 
         }),
       });
-
       if (!res.ok) {
         throw new Error('Evaluation failed');
       }
-
       const data = await res.json();
       setScore(data.score);
       setResultDetails(data.details || []);

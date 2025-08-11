@@ -109,7 +109,7 @@ function RegisterForm({ onRegisterSuccess }) {
           <div className="bg-green-600 rounded-full p-2 relative">
             <Bot size={48} className="text-white" />
           </div>
-          <h2 className="text-3xl font-extrabold text-white">Interview AI</h2>
+          <h2 className="text-3xl font-extrabold text-white">Prep Mind</h2>
           <p className="text-sm text-gray-400 text-center">
             Create your account and start your Interview preparation with Interview AI
           </p>

@@ -61,7 +61,7 @@ const handleSubmit = async (e) => {
             <Bot size={48} className="text-white" />
           </div>
 
-          <h2 className="text-3xl font-extrabold text-white">Interview AI</h2>
+          <h2 className="text-3xl font-extrabold text-white">Prep Mind</h2>
           <p className="text-sm text-gray-400 text-center">
             Login to access AI-powered interview preparation
           </p>

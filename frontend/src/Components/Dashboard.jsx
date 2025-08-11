@@ -9,14 +9,13 @@ import {
   Award,
   CheckCircle,
   Trophy,
-  LogOut // ✅ logout icon
+  LogOut,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import UserProfile from "./UserProfile";
 import ScoresList from "./ScoresList";
-import Leaderboard from "./Leaderboard"; // ✅
+import Leaderboard from "./Leaderboard";
 
-/* Animation helper */
 const fadeSlideInStyle = (delay) => ({
   animationName: "fadeSlideIn",
   animationDuration: "0.7s",
@@ -27,12 +26,11 @@ const fadeSlideInStyle = (delay) => ({
   transform: "translateY(1rem)",
 });
 
-/* Sidebar menu */
 const menuItems = [
   { icon: Upload, label: "Upload Resume" },
   { icon: Award, label: "View Scores" },
   { icon: UserCircle2, label: "Account" },
-  { icon: Trophy, label: "Leaderboard" }
+  { icon: Trophy, label: "Leaderboard" },
 ];
 
 export default function Dashboard() {
@@ -45,13 +43,11 @@ export default function Dashboard() {
 
   const userName = localStorage.getItem("name") || "User";
 
-  /* ✅ Logout handler */
   const handleLogout = () => {
-    localStorage.clear();  // destroys all local storage
-    navigate("/login");    // redirect to login page
+    localStorage.clear();
+    navigate("/login");
   };
 
-  /* File upload handler */
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     setFile(selectedFile);
@@ -99,7 +95,7 @@ export default function Dashboard() {
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center px-6 py-6 mb-3" style={fadeSlideInStyle("0.05s")}>
+          <div className="flex items-center px-6 py-6" style={fadeSlideInStyle("0.05s")}>
             <div className="bg-green-600 rounded-md p-2">
               <Bot size={48} className="text-white" />
             </div>
@@ -111,8 +107,8 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Menu items */}
-          <nav className="flex flex-col mt-2 gap-1">
+          {/* Menu items - spaced down */}
+          <nav className="flex flex-col gap-1 flex-1 mt-8">
             {menuItems.map(({ icon: Icon, label }, idx) => (
               <button
                 key={idx}
@@ -132,45 +128,69 @@ export default function Dashboard() {
               </button>
             ))}
           </nav>
+
+          {/* Divider + Logout */}
+          {/* Divider + Logout */}
+{sidebarOpen && (
+  <>
+    <hr className="border-t border-gray-700 my-3 mx-6" />
+    <div className="px-6 mb-8">
+      <button
+        onClick={handleLogout}
+        className={`
+          group
+          flex items-center gap-2 w-full
+          text-red-500 font-semibold text-base
+          px-0 py-2
+          rounded-md border border-transparent
+          transition-all duration-300 ease-out
+          outline-none
+        `}
+        style={{ justifyContent: "flex-start" }}
+      >
+        <LogOut
+          size={18}
+          className="transition-transform duration-300 ease-out group-hover:-translate-x-1"
+        />
+        <span
+          className="transition-colors duration-300 ease-out text-red-500"
+        >
+          Logout
+        </span>
+      </button>
+    </div>
+  </>
+)}
+
         </div>
       </aside>
 
-      {/* Main section */}
+      {/* Main content */}
       <div className="flex flex-col flex-grow h-screen overflow-hidden">
-        {/* Top Bar */}
+        {/* Navbar */}
         <div
           className="flex items-center justify-between px-10 bg-gray-900"
           style={{ height: 70, minHeight: 70, ...fadeSlideInStyle("0.15s") }}
         >
-          <div className="flex items-center gap-4">
-            <button
-              className="p-2 rounded hover:bg-gray-800"
-              onClick={() => setSidebarOpen((open) => !open)}
-              aria-label="Toggle sidebar"
-            >
-              <Menu size={32} className="text-white" />
-            </button>
-            <span className="text-white font-semibold text-sm">
-              Hello, {userName}
-            </span>
-          </div>
-          {/* ✅ Logout button */}
           <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-md transition"
+            className="p-2 rounded hover:bg-gray-800"
+            onClick={() => setSidebarOpen((open) => !open)}
+            aria-label="Toggle sidebar"
           >
-            <LogOut size={16} /> Logout
+            <Menu size={32} className="text-white" />
           </button>
+          <span className="text-white font-semibold text-base ml-auto">
+            Hello, {userName}
+          </span>
         </div>
-
         <hr className="border-gray-700" />
 
-        {/* Content */}
+        {/* Page Content */}
         <main className="overflow-auto bg-gray-900 p-10 flex-grow">
           <div className="max-w-3xl mx-auto">
             {currentPage === "Upload Resume" && (
               <>
-                {/* Upload Resume UI */}
+                {/* Upload Resume Section */}
                 <div className="flex justify-between items-center mb-8" style={fadeSlideInStyle("0.22s")}>
                   <div>
                     <h2 className="text-2xl font-bold text-white flex items-center gap-3">
@@ -186,7 +206,6 @@ export default function Dashboard() {
                     <span>PDF format only</span>
                   </div>
                 </div>
-
                 <form onSubmit={(e) => e.preventDefault()}>
                   <div
                     style={fadeSlideInStyle("0.32s")}
@@ -217,7 +236,9 @@ export default function Dashboard() {
                       </span>{" "}
                       to upload
                     </div>
-                    <div className="text-xs text-gray-500">Supports PDF files up to 10MB</div>
+                    <div className="text-xs text-gray-500">
+                      Supports PDF files up to 10MB
+                    </div>
                     <input
                       type="file"
                       accept="application/pdf"
@@ -226,7 +247,6 @@ export default function Dashboard() {
                       className="hidden"
                     />
                   </div>
-
                   {file && (
                     <div className="mt-6 flex justify-end" style={fadeSlideInStyle("0.38s")}>
                       <button
@@ -239,7 +259,6 @@ export default function Dashboard() {
                     </div>
                   )}
                 </form>
-
                 {/* Guidelines */}
                 <div style={fadeSlideInStyle("0.48s")} className="mt-10">
                   <hr className="border-gray-700 mb-6" />
@@ -264,19 +283,15 @@ export default function Dashboard() {
                 </div>
               </>
             )}
-
             {currentPage === "View Scores" && <ScoresList />}
             {currentPage === "Account" && <UserProfile />}
             {currentPage === "Leaderboard" && <Leaderboard />}
           </div>
-
-          {/* Footer */}
           <div className="max-w-3xl mx-auto mt-20" style={fadeSlideInStyle("0.7s")}>
             <hr className="border-gray-700 mb-4" />
             <footer className="text-center text-xs text-gray-500">
               © 2025 Prep Mind. All rights reserved.
-              <br /><br />
-              Made with ❤️ by Md Raza.
+              <br /><br />Made with ❤️ by Md Raza.
             </footer>
           </div>
         </main>
