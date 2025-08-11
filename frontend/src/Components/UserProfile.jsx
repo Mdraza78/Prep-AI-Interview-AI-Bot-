@@ -246,15 +246,21 @@ export default function UserProfile() {
         }
       `}</style>
 
-      {successMsg && (
-        <div
-          style={fadeSlideInStyle("0.05s")}
-          className="mb-4 flex items-center justify-between p-4 rounded-lg bg-green-600 text-white shadow relative"
-        >
-          <span className="font-semibold">{successMsg}</span>
-          <button onClick={() => setSuccessMsg(null)}>✖</button>
-        </div>
-      )}
+     {successMsg && (
+  <div
+    style={fadeSlideInStyle("0.05s")}
+    className="mb-4 flex items-center justify-between p-4 rounded-lg bg-green-600 text-white shadow relative"
+  >
+    <span className="font-semibold">{successMsg}</span>
+    <button
+      onClick={() => setSuccessMsg(null)}
+      className="text-white hover:text-gray-200 transition-colors"
+    >
+      ✖
+    </button>
+  </div>
+)}
+
 
       {error && (
         <div

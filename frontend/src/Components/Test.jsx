@@ -4,15 +4,23 @@ import { useNavigate } from "react-router-dom";
 
 const BORDER_COLOR = "#238636";
 
+// Animation helper
+const fadeSlideInStyle = (delay) => ({
+  animationName: "fadeSlideIn",
+  animationDuration: "0.7s",
+  animationTimingFunction: "ease-out",
+  animationFillMode: "forwards",
+  animationDelay: delay,
+  opacity: 0,
+  transform: "translateY(1rem)",
+});
+
 function QuestionDisplay({ question }) {
-  // FIXED: Code block regex and rendering logic
-  // Regex matches `````` sections and splits normal text vs code
   const codeBlockRegex = /``````/g;
   const parts = [];
   let lastIndex = 0, match, key = 0;
 
   while ((match = codeBlockRegex.exec(question)) !== null) {
-    // Text before code
     if (match.index > lastIndex) {
       const text = question.slice(lastIndex, match.index);
       if (text.trim()) {
@@ -23,7 +31,6 @@ function QuestionDisplay({ question }) {
         );
       }
     }
-    // Code block
     const codeContent = match[1];
     parts.push(
       <div
@@ -37,7 +44,6 @@ function QuestionDisplay({ question }) {
     );
     lastIndex = match.index + match[0].length;
   }
-  // Remaining text after last code block
   if (lastIndex < question.length) {
     const text = question.slice(lastIndex);
     if (text.trim()) {
@@ -70,14 +76,13 @@ export default function Test() {
   const navigate = useNavigate();
   const recognitionRef = useRef(null);
 
-  // Handles auto-redirect if not logged in or no resumeText
   useEffect(() => {
     async function fetchQuestions() {
       setIsLoadingQuestions(true);
       try {
         const token = localStorage.getItem("token");
         if (!token) {
-          navigate('/login');
+          navigate("/login");
           return;
         }
         const resumeText = localStorage.getItem("resumeText");
@@ -95,7 +100,7 @@ export default function Test() {
           body: JSON.stringify({ resumeText }),
         });
         if (!res.ok) {
-          throw new Error('Failed to fetch questions');
+          throw new Error("Failed to fetch questions");
         }
         const data = await res.json();
         if (data.questions && data.questions.length === 5) {
@@ -133,7 +138,6 @@ export default function Test() {
       alert("For the coding question, please type your answer.");
       return;
     }
-    // Use browser compatibility check, print error if not available
     let SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       alert("Your browser does not support voice input.");
@@ -155,12 +159,11 @@ export default function Test() {
       recognition.onerror = (event) => {
         setIsRecording(false);
         recognition.stop();
-        // Print error type
         console.error("[SpeechRecognition error]", event.error);
-        if (event.error === 'not-allowed') {
-          alert('Microphone permission denied. Please allow access in your browser.');
-        } else if (event.error === 'no-speech') {
-          alert('No speech detected. Try speaking clearly into your microphone.');
+        if (event.error === "not-allowed") {
+          alert("Microphone permission denied. Please allow access.");
+        } else if (event.error === "no-speech") {
+          alert("No speech detected.");
         } else {
           alert(`Speech recognition error: ${event.error}`);
         }
@@ -199,7 +202,7 @@ export default function Test() {
 
   const handleSkip = () => {
     const temp = [...answers];
-    temp[currentIndex] = ""; // skipped
+    temp[currentIndex] = ""; 
     setAnswers(temp);
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex(currentIndex + 1);
@@ -242,7 +245,7 @@ export default function Test() {
         }),
       });
       if (!res.ok) {
-        throw new Error('Evaluation failed');
+        throw new Error("Evaluation failed");
       }
       const data = await res.json();
       setScore(data.score);
@@ -256,29 +259,58 @@ export default function Test() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0e1a23] via-[#1b2735] to-[#202935]">
+    <div className="min-h-screen flex flex-col bg-gray-900 bg-gradient-to-br from-[#0e1a23] via-[#1b2735] to-[#202935]">
+      {/* Animations */}
+      <style>{`
+        @keyframes fadeSlideIn {
+          0% { opacity: 0; transform: translateY(1rem); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fade-slide {
+          0% { opacity: 0; transform: translateY(20px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-slide { animation: fade-slide 0.6s cubic-bezier(.28,.84,.42,1) forwards; }
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 12px 3px ${BORDER_COLOR}88; }
+          50% { box-shadow: 0 0 20px 5px ${BORDER_COLOR}cc; }
+        }
+        .animate-progress-pulse { animation: pulse-glow 2.5s infinite ease-in-out; }
+      `}</style>
+
       {/* Header */}
-      <header className="w-full bg-[#181f27] border-b-2 border-green-700 shadow-lg">
+      <header className="w-full bg-[#181f27] border-b-2 border-gray-500 shadow-lg" style={fadeSlideInStyle("0s")}>
         <div className="flex items-center justify-between max-w-5xl mx-auto py-7 px-6">
-          <div className="flex items-center gap-4">
-            <Bot size={44} className="text-green-700" />
-            <h1 className="text-2xl font-semibold tracking-wide text-white">
-              Prep Mind Interview
-            </h1>
+          <div className="flex items-center" style={fadeSlideInStyle("0.1s")}>
+            <div
+              className="w-14 h-14 bg-green-700 rounded-xl flex items-center justify-center"
+              style={{ minWidth: 56, minHeight: 56 }}
+            >
+              <Bot size={32} className="text-white" />
+            </div>
+            <div className="ml-4">
+              <h1 className="text-3xl font-bold text-white leading-tight">
+                Prep Mind
+              </h1>
+              <div className="text-base text-gray-200 opacity-85 -mt-1">
+                Smart Preparation
+              </div>
+            </div>
           </div>
-          <div className="text-base font-normal text-white opacity-70">
+          <div className="text-base font-normal text-white opacity-70" style={fadeSlideInStyle("0.2s")}>
             Hello, {userName}
           </div>
         </div>
       </header>
 
-      {/* Main card */}
-      <main className="flex-1 flex items-center justify-center w-full py-8 px-2">
+      {/* Main */}
+      <main className="flex-1 flex items-center justify-center w-full py-8 px-2" style={fadeSlideInStyle("0.3s")}>
         <div
-          className="w-full max-w-3xl rounded-2xl shadow-xl border border-solid border-green-700 px-10 sm:px-20 py-12 my-12 animate-fade-slide"
+          className="w-full max-w-3xl rounded-2xl shadow-xl border border-solid border-green-700 px-10 sm:px-20 py-12 my-12"
           style={{
             backgroundColor: "#17212d",
             boxShadow: "0 8px 32px 0 rgba(22,101,52,0.15), 0 2px 7px 0 #131e2a80",
+            ...fadeSlideInStyle("0.4s"),
           }}
         >
           {isLoadingQuestions ? (
@@ -286,49 +318,16 @@ export default function Test() {
               Loading your interview…
             </div>
           ) : score !== null ? (
-            <div className="text-center py-16">
-              <h2 className="text-3xl font-semibold mb-4 text-green-700">
+            <div className="text-center py-16" style={fadeSlideInStyle("0.5s")}>
+              <h2 className="text-3xl font-semibold mb-4">
                 Interview Complete!
               </h2>
-              <div className="text-base font-normal text-green-400 mb-2">
+              <div className="text-base font-normal mb-2">
                 Your Score:
               </div>
-              <div className="text-5xl font-semibold mb-10 text-green-700">
+              <div className="text-5xl font-semibold mb-10 ">
                 {score} / 100
               </div>
-
-              {/* Per-question feedback */}
-              {resultDetails.length > 0 && (
-                <div className="my-8 text-left">
-                  <h3 className="text-xl text-green-700 mb-3">
-                    Per-Question Feedback:
-                  </h3>
-                  {resultDetails.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="mb-6 bg-[#181f27] rounded-xl border border-green-700 p-5"
-                    >
-                      <div className="text-green-300 font-bold mb-1">
-                        Question {idx + 1}:
-                      </div>
-                      <div className="text-green-100 mb-2">{item.question}</div>
-                      <div className="text-green-500 mb-2">
-                        Your answer:{" "}
-                        <span className="text-green-200">{item.answer}</span>
-                      </div>
-                      <div className="mb-2 text-white font-bold">
-                        Score:{" "}
-                        <span className="text-green-400 font-semibold">
-                          {item.individualScore} / 20
-                        </span>
-                      </div>
-                      {item.feedback && (
-                        <div className="text-green-300">Feedback: {item.feedback}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
 
               <div className="flex justify-center">
                 <button
@@ -345,8 +344,10 @@ export default function Test() {
             </p>
           ) : (
             <>
-              {/* Progress bar */}
-              <div className="relative w-full h-3 rounded-lg mb-6 overflow-hidden bg-[#1e293a] border border-green-700">
+              <div
+                className="relative w-full h-3 rounded-lg mb-6 overflow-hidden bg-[#1e293a] border border-green-700"
+                style={fadeSlideInStyle("0.5s")}
+              >
                 <div
                   className="absolute left-0 top-0 h-full rounded transition-all duration-700 animate-progress-pulse"
                   style={{
@@ -357,7 +358,7 @@ export default function Test() {
                 ></div>
               </div>
 
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3" style={fadeSlideInStyle("0.6s")}>
                 <span className="uppercase tracking-wider font-medium text-base text-green-700">
                   Question {currentIndex + 1} of {questions.length}
                 </span>
@@ -370,8 +371,7 @@ export default function Test() {
                 </button>
               </div>
 
-              {/* Question and display */}
-              <div className="mb-6">
+              <div className="mb-6" style={fadeSlideInStyle("0.7s")}>
                 <QuestionDisplay question={questions[currentIndex]} />
                 {isSpeaking && (
                   <span className="inline-block align-middle ml-3">
@@ -381,7 +381,8 @@ export default function Test() {
                   </span>
                 )}
               </div>
-              <div className="mb-2">
+
+              <div className="mb-2" style={fadeSlideInStyle("0.8s")}>
                 {currentIndex < 4 ? (
                   <>
                     <div className="flex justify-center mb-2">
@@ -415,7 +416,7 @@ export default function Test() {
                 )}
               </div>
 
-              <div className="flex justify-center mt-7 space-x-6">
+              <div className="flex justify-center mt-7 space-x-6" style={fadeSlideInStyle("0.9s")}>
                 <button
                   onClick={handleSkip}
                   className="w-36 py-3 rounded-lg font-semibold bg-green-700 text-white shadow hover:bg-green-800 active:scale-95 transition-transform duration-300 ease-in-out"
@@ -446,28 +447,13 @@ export default function Test() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full bg-[#181f27] border-t-2 border-green-700 py-4 mt-4">
+      <footer className="w-full bg-[#181f27] border-t- border-gray-500 py-4 mt-4" style={fadeSlideInStyle("1s")}>
         <div className="text-center text-green-700 font-medium tracking-wide text-base">
           © 2025 Prep Mind.
           <span className="text-gray-400"> All rights reserved. </span>
           <span className="text-xs text-gray-500 block mt-1">Made with ❤️ by Md Raza.</span>
         </div>
       </footer>
-
-      {/* Animations */}
-      <style>{`
-        @keyframes fade-slide {
-          0% { opacity: 0; transform: translateY(20px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-slide { animation: fade-slide 0.6s cubic-bezier(.28,.84,.42,1) forwards; }
-
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 12px 3px ${BORDER_COLOR}88; }
-          50% { box-shadow: 0 0 20px 5px ${BORDER_COLOR}cc; }
-        }
-        .animate-progress-pulse { animation: pulse-glow 2.5s infinite ease-in-out; }
-      `}</style>
     </div>
   );
 }

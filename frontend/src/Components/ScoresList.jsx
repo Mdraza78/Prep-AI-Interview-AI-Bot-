@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { TrendingUp, Target, Award, Calendar, Clock, Eye, ArrowLeft } from "lucide-react";
+import {
+  TrendingUp,
+  Target,
+  Award,
+  Calendar,
+  Clock,
+  Eye,
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight
+} from "lucide-react";
 
 // Format date/time function
 function formatDateTime(dateStr) {
@@ -22,7 +32,6 @@ export default function ScoresList() {
   const [activeDetailAttempt, setActiveDetailAttempt] = useState(null);
 
   const attemptsPerPage = 5; // show only 5 attempts per page
-
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
@@ -116,16 +125,14 @@ export default function ScoresList() {
           0% { opacity: 0; transform: translateY(1rem); }
           100% { opacity: 1; transform: translateY(0); }
         }
-        summary::-webkit-details-marker { display: none; }
-        summary::marker { display: none; }
       `}</style>
 
       <div className="max-w-[820px] mx-auto pt-4 pb-6 px-4">
-        {/* Main List View */}
         {!activeDetailAttempt ? (
           <>
             {/* Summary Cards */}
             <div className="flex flex-col sm:flex-row gap-5 mb-9">
+              {/* Total Tests */}
               <div
                 style={fadeSlideInStyle("0.1s")}
                 className="flex items-center gap-4 rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg py-7 px-6 w-[250px] hover:scale-105 transition-transform"
@@ -138,7 +145,7 @@ export default function ScoresList() {
                   <div className="text-gray-300 text-base">Total Tests</div>
                 </div>
               </div>
-
+              {/* Average Score */}
               <div
                 style={fadeSlideInStyle("0.3s")}
                 className="flex items-center gap-4 rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg py-7 px-6 w-[250px] hover:scale-105 transition-transform"
@@ -151,7 +158,7 @@ export default function ScoresList() {
                   <div className="text-gray-300 text-base">Average Score</div>
                 </div>
               </div>
-
+              {/* Best Score */}
               <div
                 style={fadeSlideInStyle("0.5s")}
                 className="flex items-center gap-4 rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg py-7 px-6 w-[250px] hover:scale-105 transition-transform"
@@ -166,56 +173,46 @@ export default function ScoresList() {
               </div>
             </div>
 
-            {/* Attempt Cards */}
+            {/* Attempts List */}
             <h5 className="text-white text-3xl mb-7">Recent Test Results</h5>
-             
             <div className="flex flex-col gap-7">
               {currentAttempts.map((attempt, idx) => {
-                const formattedDateTime = formatDateTime(attempt.createdAt);
-                const [datePart, timePart] = formattedDateTime
-                  ? formattedDateTime.split(", ")
-                  : ["-", "-"];
+                const [datePart, timePart] = formatDateTime(attempt.createdAt).split(", ");
                 const percentage = Math.round(attempt.totalScore);
-
                 return (
                   <div
                     key={attempt._id || idx}
                     style={fadeSlideInStyle(`${0.1 * (idx + 1)}s`)}
-                    className="rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg p-6 w-[736px]"
+                    className="rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg p-6"
                   >
-                    {/* Row: attempt info + percentage */}
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between gap-4">
                       <div>
-                        <div className="text-white font-semibold text-lg flex items-center gap-2">
+                        <div className="text-white font-semibold text-lg">
                           Attempt #{totalTests - (startIndex + idx)}
                         </div>
-                        <div className="text-xs text-gray-400 mt-3 flex items-center gap-6">
+                        <div className="text-xs text-gray-400 mt-2 flex gap-6">
                           <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            <span>{datePart}</span>
+                            <Calendar className="w-4 h-4" /> {datePart}
                           </div>
                           <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            <span>{timePart}</span>
+                            <Clock className="w-4 h-4" /> {timePart}
                           </div>
                         </div>
-                        <div className="text-green-400 font-semibold text-lg mt-4 flex items-center gap-2">
-                          <Target className="w-6 h-6" />
-                          <span className="text-l text-white font-normal">
+                        <div className="text-green-400 mt-4 flex items-center gap-2">
+                          <Target className="w-5 h-5" />
+                          <span className="text-white">
                             {attempt.totalScore}/100 marks
                           </span>
                         </div>
                       </div>
-                      <div className="text-3xl font-semibold text-green-400">
+                      <div className="text-3xl font-bold text-green-400">
                         {percentage}%
                       </div>
                     </div>
-
-                    {/* View Details */}
-                    <div className="mt-8 border-t border-t-gray-500 rounded-b-lg">
+                    <div className="mt-6 border-t border-gray-600 pt-3">
                       <button
                         onClick={() => setActiveDetailAttempt(attempt)}
-                        className="w-full text-center pt-2 cursor-pointer font-medium hover:text-green-300 text-base outline-none text-gray-200 flex justify-center items-center gap-2"
+                        className="w-full text-center font-medium hover:text-green-300 text-gray-200 flex justify-center items-center gap-2"
                       >
                         <Eye className="w-5 h-5" /> View Details
                       </button>
@@ -225,95 +222,80 @@ export default function ScoresList() {
               })}
             </div>
 
-            {/* Pagination controls */}
+            {/* Pagination - lucide-react version */}
             {totalPages > 1 && (
-              <div className="flex justify-center items-center gap-4 mt-8">
+              <div className="flex justify-center items-center gap-6 mt-6">
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                   disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded ${
+                  className={`p-2 rounded-full ${
                     currentPage === 1
                       ? "bg-gray-700 text-gray-500 cursor-not-allowed"
                       : "bg-green-600 text-white hover:bg-green-700"
                   }`}
                 >
-                  Previous
+                  <ChevronLeft className="w-5 h-5" />
                 </button>
                 <span className="text-white">
                   Page {currentPage} of {totalPages}
                 </span>
                 <button
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(p + 1, totalPages))
-                  }
+                  onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded ${
+                  className={`p-2 rounded-full ${
                     currentPage === totalPages
                       ? "bg-gray-700 text-gray-500 cursor-not-allowed"
                       : "bg-green-600 text-white hover:bg-green-700"
                   }`}
                 >
-                  Next
+                  <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
             )}
           </>
         ) : (
-          // DETAIL VIEW
+          // Detail View
           <div
             style={fadeSlideInStyle("0.1s")}
-            className="rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg p-8 mx-auto max-w-2xl mt-10"
+            className="rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg p-8 mx-auto max-w-2xl"
           >
             <button
               onClick={() => setActiveDetailAttempt(null)}
-              className="mb-8 px-4 py-2 bg-gray-700 text-white rounded hover:bg-green-600 transition flex items-center gap-2"
+              className="mb-6 px-4 py-2 bg-gray-700 text-white rounded hover:bg-green-600 flex items-center gap-2"
             >
-              <ArrowLeft className="w-5 h-5" />
-              Back
+              <ArrowLeft className="w-5 h-5" /> Back
             </button>
-            <h3 className="text-2xl font-semibold mb-8 text-grey-800 text-center">
-              Attempt Details
-            </h3>
-           
-          <div className="flex flex-col gap-6">
-  {activeDetailAttempt.questions?.map((q, qidx) => (
-    <div
-      key={qidx}
-      className="rounded-xl border border-gray-700 bg-[#1B232F] shadow p-0 overflow-hidden"
-      style={fadeSlideInStyle(`${0.1 * (qidx + 1)}s`)}
-    >
-      {/* Top colored bar with Q# and score */}
-      <div className="flex justify-between items-center px-5 py-2 bg-[#222B3A] border-b border-gray-700">
-        <span className="font-semibold text-green-300">
-          <i>Question{qidx + 1}</i>
-        </span>
-        <span className="font-semibold text-green-400 text-sm">
-          {q.individualScore} / 20
-        </span>
-      </div>
-      {/* Main question, answer, feedback */}
-      <div className="px-5 py-4">
-        <div className="font-semibold text-base mb-2">
-          {q.question}
-        </div>
-        <br />
-        <div className="mb-1 text-gray-300">
-          <span className=" text-grey font-semibold">Your answer:</span>{" "}
-          {q.answer}
-        </div>
-        <br />
-       {q.feedback && (
-  <div className=" italic mt-2">
-    <span className="font-semibold">Feedback:</span>{" "}
-    <span className="font-normal">{q.feedback}</span>
-  </div>
-)}
+            <h3 className="text-2xl font-semibold mb-8 text-center">Attempt Details</h3>
 
-      </div>
-    </div>
-  ))}
-</div>
-
+            <div className="flex flex-col gap-6">
+              {activeDetailAttempt.questions?.map((q, qidx) => (
+                <div
+                  key={qidx}
+                  style={fadeSlideInStyle(`${0.1 * (qidx + 1)}s`)}
+                  className="rounded-xl border border-gray-700 bg-[#1B232F] shadow"
+                >
+                  <div className="flex justify-between items-center px-5 py-2 bg-[#222B3A] border-b border-gray-700">
+                    <span className="text-green-300 font-semibold">
+                      Question {qidx + 1}
+                    </span>
+                    <span className="text-green-400 font-semibold text-sm">
+                      {q.individualScore} / 20
+                    </span>
+                  </div>
+                  <div className="px-5 py-4">
+                    <div className="font-semibold">{q.question}</div>
+                    <div className="mt-2 text-gray-300">
+                      <span className="font-semibold">Your answer:</span> {q.answer}
+                    </div>
+                    {q.feedback && (
+                      <div className="mt-2 italic">
+                        <span className="font-semibold">Feedback:</span> {q.feedback}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
