@@ -18,14 +18,19 @@ const fadeSlideInStyle = (delay) => ({
 function QuestionDisplay({ question }) {
   const codeBlockRegex = /``````/g;
   const parts = [];
-  let lastIndex = 0, match, key = 0;
+  let lastIndex = 0,
+    match,
+    key = 0;
 
   while ((match = codeBlockRegex.exec(question)) !== null) {
     if (match.index > lastIndex) {
       const text = question.slice(lastIndex, match.index);
       if (text.trim()) {
         parts.push(
-          <div key={`text-${key++}`} className="mb-2 text-base text-white whitespace-pre-wrap">
+          <div
+            key={`text-${key++}`}
+            className="mb-2 text-base text-white whitespace-pre-wrap"
+          >
             {text.trim()}
           </div>
         );
@@ -48,14 +53,19 @@ function QuestionDisplay({ question }) {
     const text = question.slice(lastIndex);
     if (text.trim()) {
       parts.push(
-        <div key={`text-end`} className="mt-1 text-base text-white whitespace-pre-wrap">
+        <div
+          key={`text-end`}
+          className="mt-1 text-base text-white whitespace-pre-wrap"
+        >
           {text.trim()}
         </div>
       );
     }
   }
   if (parts.length === 0) {
-    return <div className="text-base text-white whitespace-pre-wrap">{question}</div>;
+    return (
+      <div className="text-base text-white whitespace-pre-wrap">{question}</div>
+    );
   }
   return <>{parts}</>;
 }
@@ -71,12 +81,54 @@ export default function Test() {
   const [score, setScore] = useState(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [resultDetails, setResultDetails] = useState([]);
+  const [recognitionSupported, setRecognitionSupported] = useState(false);
 
   const userName = localStorage.getItem("name") || "User";
   const navigate = useNavigate();
   const recognitionRef = useRef(null);
+  const speechSynthesisRef = useRef(null);
 
   useEffect(() => {
+    // Initialize speech recognition
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      setRecognitionSupported(true);
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
+
+      recognition.onstart = () => setIsRecording(true);
+
+      // ✅ FIX: Capture ALL speech segments, not just first one
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        setAnswerInput(transcript.trim());
+      };
+
+      recognition.onerror = (event) => {
+        setIsRecording(false);
+        console.error("Speech recognition error:", event.error);
+        if (event.error === "not-allowed") {
+          alert("Microphone access denied. Please allow microphone permission.");
+        }
+      };
+
+      recognition.onend = () => setIsRecording(false);
+
+      recognitionRef.current = recognition;
+    }
+
+    // Initialize speech synthesis
+    if ("speechSynthesis" in window) {
+      speechSynthesisRef.current = window.speechSynthesis;
+    }
+
+    // Fetch questions
     async function fetchQuestions() {
       setIsLoadingQuestions(true);
       try {
@@ -91,14 +143,17 @@ export default function Test() {
           navigate("/dashboard");
           return;
         }
-        const res = await fetch("http://localhost:5000/api/user/start-interview", {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({ resumeText }),
-        });
+        const res = await fetch(
+          "http://localhost:5000/api/user/start-interview",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ resumeText }),
+          }
+        );
         if (!res.ok) {
           throw new Error("Failed to fetch questions");
         }
@@ -119,69 +174,63 @@ export default function Test() {
       }
     }
     fetchQuestions();
-    // eslint-disable-next-line
+
+    return () => {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      if (speechSynthesisRef.current) speechSynthesisRef.current.cancel();
+    };
   }, [navigate]);
 
   function speakText(text) {
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const utter = new window.SpeechSynthesisUtterance(text);
+    if (!speechSynthesisRef.current) return;
+    speechSynthesisRef.current.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
     utter.rate = 0.97;
     setIsSpeaking(true);
     utter.onend = () => setIsSpeaking(false);
     utter.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utter);
+    speechSynthesisRef.current.speak(utter);
   }
 
-  const startRecording = () => {
+  const startRecording = async () => {
     if (currentIndex === 4) {
       alert("For the coding question, please type your answer.");
       return;
     }
-    let SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Your browser does not support voice input.");
+
+    if (!recognitionRef.current) {
+      alert("Voice input is not supported in your browser");
       return;
     }
+
     try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = "en-US";
-      recognition.interimResults = false;
-      recognition.continuous = false;
-      recognition.onstart = () => setIsRecording(true);
-      recognition.onresult = (event) => {
-        let transcript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript || "";
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+
+      setIsRecording(true);
+      setAnswerInput("");
+      recognitionRef.current.start();
+
+      setTimeout(() => {
+        if (isRecording) {
+          stopRecording();
+          alert("Voice input timed out. Please try again.");
         }
-        setAnswerInput(transcript || "");
-      };
-      recognition.onerror = (event) => {
-        setIsRecording(false);
-        recognition.stop();
-        console.error("[SpeechRecognition error]", event.error);
-        if (event.error === "not-allowed") {
-          alert("Microphone permission denied. Please allow access.");
-        } else if (event.error === "no-speech") {
-          alert("No speech detected.");
-        } else {
-          alert(`Speech recognition error: ${event.error}`);
-        }
-      };
-      recognition.onend = () => setIsRecording(false);
-      recognition.start();
-      recognitionRef.current = recognition;
-    } catch (e) {
+      }, 10000);
+    } catch (err) {
+      console.error("Error starting recording:", err);
       setIsRecording(false);
-      alert("Error starting voice recognition.");
+      if (err.name === "NotAllowedError") {
+        alert("Microphone access denied. Please allow microphone permission.");
+      }
     }
   };
 
   const stopRecording = () => {
-    if (recognitionRef.current) {
+    if (recognitionRef.current && isRecording) {
       recognitionRef.current.stop();
-      setIsRecording(false);
     }
+    setIsRecording(false);
   };
 
   const handleNext = () => {
@@ -202,7 +251,7 @@ export default function Test() {
 
   const handleSkip = () => {
     const temp = [...answers];
-    temp[currentIndex] = ""; 
+    temp[currentIndex] = "";
     setAnswers(temp);
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex(currentIndex + 1);
@@ -218,7 +267,7 @@ export default function Test() {
   const handleEndTest = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      navigate('/login');
+      navigate("/login");
       return;
     }
     const trimmed = answerInput.trim();
@@ -234,19 +283,17 @@ export default function Test() {
       const resumeText = localStorage.getItem("resumeText");
       const res = await fetch("http://localhost:5000/api/user/evaluate-test", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ 
-          resumeText, 
-          questions, 
-          answers: temp 
+        body: JSON.stringify({
+          resumeText,
+          questions,
+          answers: temp,
         }),
       });
-      if (!res.ok) {
-        throw new Error("Evaluation failed");
-      }
+      if (!res.ok) throw new Error("Evaluation failed");
       const data = await res.json();
       setScore(data.score);
       setResultDetails(data.details || []);
@@ -297,7 +344,10 @@ export default function Test() {
               </div>
             </div>
           </div>
-          <div className="text-base font-normal text-white opacity-70" style={fadeSlideInStyle("0.2s")}>
+          <div
+            className="text-base font-normal text-white opacity-70"
+            style={fadeSlideInStyle("0.2s")}
+          >
             Hello, {userName}
           </div>
         </div>
@@ -309,7 +359,8 @@ export default function Test() {
           className="w-full max-w-3xl rounded-2xl shadow-xl border border-solid border-green-700 px-10 sm:px-20 py-12 my-12"
           style={{
             backgroundColor: "#17212d",
-            boxShadow: "0 8px 32px 0 rgba(22,101,52,0.15), 0 2px 7px 0 #131e2a80",
+            boxShadow:
+              "0 8px 32px 0 rgba(22,101,52,0.15), 0 2px 7px 0 #131e2a80",
             ...fadeSlideInStyle("0.4s"),
           }}
         >
@@ -319,16 +370,13 @@ export default function Test() {
             </div>
           ) : score !== null ? (
             <div className="text-center py-16" style={fadeSlideInStyle("0.5s")}>
-              <h2 className="text-3xl font-semibold mb-4">
+              <h2 className="text-3xl font-semibold mb-4 text-white">
                 Interview Complete!
               </h2>
-              <div className="text-base font-normal mb-2">
-                Your Score:
-              </div>
-              <div className="text-5xl font-semibold mb-10 ">
+              <div className="text-base font-normal mb-2 text-white">Your Score:</div>
+              <div className="text-3xl font-semibold mb-10 text-white ">
                 {score} / 100
               </div>
-
               <div className="flex justify-center">
                 <button
                   onClick={() => navigate("/dashboard")}
@@ -344,6 +392,7 @@ export default function Test() {
             </p>
           ) : (
             <>
+              {/* Progress bar */}
               <div
                 className="relative w-full h-3 rounded-lg mb-6 overflow-hidden bg-[#1e293a] border border-green-700"
                 style={fadeSlideInStyle("0.5s")}
@@ -358,7 +407,11 @@ export default function Test() {
                 ></div>
               </div>
 
-              <div className="flex items-center justify-between mb-3" style={fadeSlideInStyle("0.6s")}>
+              {/* Question header */}
+              <div
+                className="flex items-center justify-between mb-3"
+                style={fadeSlideInStyle("0.6s")}
+              >
                 <span className="uppercase tracking-wider font-medium text-base text-green-700">
                   Question {currentIndex + 1} of {questions.length}
                 </span>
@@ -371,6 +424,7 @@ export default function Test() {
                 </button>
               </div>
 
+              {/* Question body */}
               <div className="mb-6" style={fadeSlideInStyle("0.7s")}>
                 <QuestionDisplay question={questions[currentIndex]} />
                 {isSpeaking && (
@@ -382,14 +436,22 @@ export default function Test() {
                 )}
               </div>
 
+              {/* Answer input */}
               <div className="mb-2" style={fadeSlideInStyle("0.8s")}>
                 {currentIndex < 4 ? (
                   <>
                     <div className="flex justify-center mb-2">
                       <button
                         onClick={isRecording ? stopRecording : startRecording}
+                        disabled={!recognitionSupported}
                         className={`flex items-center gap-2 px-7 py-2 rounded-full font-normal shadow text-base transform transition-transform duration-300 ease-in-out hover:scale-105 hover:shadow-lg active:scale-95 ${
-                          isRecording ? "bg-red-500 text-white" : "bg-green-700 text-green-100"
+                          isRecording
+                            ? "bg-red-500 text-white"
+                            : "bg-green-700 text-green-100"
+                        } ${
+                          !recognitionSupported
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
                         }`}
                       >
                         {isRecording ? <MicOff size={17} /> : <Mic size={16} />}
@@ -401,7 +463,11 @@ export default function Test() {
                       readOnly
                       rows={4}
                       className="block w-full p-3 rounded-lg border border-green-700 bg-[#181f27] text-green-100 font-normal resize-none shadow-inner"
-                      placeholder="Your answer will appear here after speaking."
+                      placeholder={
+                        recognitionSupported
+                          ? "Your answer will appear here after speaking."
+                          : "Voice input not supported in your browser"
+                      }
                       value={answerInput}
                     />
                   </>
@@ -416,7 +482,11 @@ export default function Test() {
                 )}
               </div>
 
-              <div className="flex justify-center mt-7 space-x-6" style={fadeSlideInStyle("0.9s")}>
+              {/* Buttons */}
+              <div
+                className="flex justify-center mt-7 space-x-6"
+                style={fadeSlideInStyle("0.9s")}
+              >
                 <button
                   onClick={handleSkip}
                   className="w-36 py-3 rounded-lg font-semibold bg-green-700 text-white shadow hover:bg-green-800 active:scale-95 transition-transform duration-300 ease-in-out"
@@ -447,11 +517,16 @@ export default function Test() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full bg-[#181f27] border-t- border-gray-500 py-4 mt-4" style={fadeSlideInStyle("1s")}>
+      <footer
+        className="w-full bg-[#181f27] border-t- border-gray-500 py-4 mt-4"
+        style={fadeSlideInStyle("1s")}
+      >
         <div className="text-center text-green-700 font-medium tracking-wide text-base">
           © 2025 Prep Mind.
           <span className="text-gray-400"> All rights reserved. </span>
-          <span className="text-xs text-gray-500 block mt-1">Made with ❤️ by Md Raza.</span>
+          <span className="text-xs text-gray-500 block mt-1">
+            Made with ❤️ by Md Raza.
+          </span>
         </div>
       </footer>
     </div>

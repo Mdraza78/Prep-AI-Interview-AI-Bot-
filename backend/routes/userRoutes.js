@@ -264,20 +264,45 @@ router.get('/results', authenticateToken, async (req, res) => {
 
 // Leaderboard API: GET /api/user/leaderboard
 // Leaderboard API: GET /api/user/leaderboard
+// Leaderboard API: GET /api/user/leaderboard
 router.get('/leaderboard', async (req, res) => {
   try {
     const results = await TestResult.aggregate([
       {
+        // Sort all test results newest first
+        $sort: { createdAt: -1 }
+      },
+      {
+        // Group test results by userId
         $group: {
           _id: "$userId",
           totalPoints: { $sum: "$totalScore" },
-          attempts: { $sum: 1 },                        // ✅ Count attempts
-          averageScore: { $avg: "$totalScore" },        // ✅ Average score
-          bestScore: { $max: "$totalScore" }            // ✅ Best score
+          attempts: { $sum: 1 },
+          averageScore: { $avg: "$totalScore" },
+          bestScore: { $max: "$totalScore" },
+          scoresList: { $push: "$totalScore" } // Array of scores (newest first due to $sort)
+        }
+      },
+      {
+        // Extract latestScore and previousScore from scoresList
+        $project: {
+          totalPoints: 1,
+          attempts: 1,
+          bestScore: 1,
+          averageScore: { $round: ["$averageScore", 2] },
+          latestScore: { $arrayElemAt: ["$scoresList", 0] },
+          previousScore: {
+            $cond: [
+              { $gte: [{ $size: "$scoresList" }, 2] },
+              { $arrayElemAt: ["$scoresList", 1] },
+              null
+            ]
+          }
         }
       },
       { $sort: { totalPoints: -1 } },
       {
+        // Join with users collection
         $lookup: {
           from: "users",
           localField: "_id",
@@ -287,6 +312,7 @@ router.get('/leaderboard', async (req, res) => {
       },
       { $unwind: "$user" },
       {
+        // Final projection
         $project: {
           _id: 0,
           userId: "$user._id",
@@ -294,17 +320,21 @@ router.get('/leaderboard', async (req, res) => {
           totalPoints: 1,
           attempts: 1,
           bestScore: 1,
-          averageScore: { $round: ["$averageScore", 2] } // Rounds average
+          averageScore: 1,
+          latestScore: 1,
+          previousScore: 1
         }
       },
       { $limit: 100 }
     ]);
+
     res.json({ leaderboard: results });
   } catch (err) {
     console.error("Error creating leaderboard:", err);
     res.status(500).json({ error: "Failed to load leaderboard" });
   }
 });
+
 
 
 
