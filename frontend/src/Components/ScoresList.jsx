@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
+import { API_URLS } from "../config/api";
 
 // Format date/time function
 function formatDateTime(dateStr) {
@@ -39,7 +40,7 @@ export default function ScoresList() {
     async function fetchScores() {
       try {
         setLoading(true);
-        const res = await fetch("http://localhost:5000/api/user/results", {
+        const res = await fetch(API_URLS.RESULTS, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();

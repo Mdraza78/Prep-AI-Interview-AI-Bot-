@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { API_URLS } from "../config/api";
 
 const BIO_WORD_LIMIT = 20;
 
@@ -44,7 +45,7 @@ export default function UserProfile() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch("http://localhost:5000/api/user/profile", {
+        const res = await fetch(API_URLS.PROFILE, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Failed to load profile");
@@ -125,7 +126,7 @@ export default function UserProfile() {
         imageUrl: profile.imageUrl,
       };
 
-      const res = await fetch("http://localhost:5000/api/user/profile", {
+      const res = await fetch(API_URLS.PROFILE, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -260,7 +261,6 @@ export default function UserProfile() {
     </button>
   </div>
 )}
-
 
       {error && (
         <div

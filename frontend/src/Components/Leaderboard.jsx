@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMedal, faRankingStar, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { API_URLS } from "../config/api";
 
 // Animation helper
 const fadeSlideInStyle = (delay) => ({
@@ -22,7 +23,7 @@ export default function Leaderboard() {
   const currentUserId = localStorage.getItem("userId");
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/user/leaderboard")
+    fetch(API_URLS.LEADERBOARD)
       .then((r) => r.json())
       .then((data) => {
         setLeaderboard(data.leaderboard || []);
@@ -37,7 +38,7 @@ export default function Leaderboard() {
   const currentUsers = leaderboard.slice(startIndex, startIndex + usersPerPage);
 
   return (
-    <div className="max-w-6xl mx-auto py-10 px-4">
+    <div className="max-w-7xl mx-auto py-10 px-2">
       <style>{`
         @keyframes fadeSlideIn {
           0% { opacity: 0; transform: translateY(1rem);}
@@ -91,9 +92,9 @@ export default function Leaderboard() {
               <div
                 key={entry.userId}
                 style={fadeSlideInStyle(`${0.2 + idx * 0.07}s`)}
-                className={`grid grid-cols-12 items-center px-7 py-4 border-b border-gray-700 text-center
-                  ${(startIndex + idx) < 3 ? "bg-[#232e3f]/50" : ""} 
-                  ${isCurrentUser ? "border-green-500 border-2" : ""}`}
+               className={`grid grid-cols-12 items-center px-7 py-4 border-b border-gray-700 text-center
+  ${(startIndex + idx) < 3 ? "bg-400/10" : ""}
+  ${isCurrentUser ? "bg-green-500/40" : ""}`}
               >
                 {/* Rank col */}
                 <div className="col-span-2 flex justify-center items-center">

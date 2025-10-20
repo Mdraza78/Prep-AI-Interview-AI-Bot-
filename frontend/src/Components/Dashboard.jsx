@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import UserProfile from "./UserProfile";
 import ScoresList from "./ScoresList";
 import Leaderboard from "./Leaderboard";
+import { API_URLS } from "../config/api";
 
 const fadeSlideInStyle = (delay) => ({
   animationName: "fadeSlideIn",
@@ -54,7 +55,7 @@ export default function Dashboard() {
     if (selectedFile && selectedFile.type === "application/pdf") {
       const formData = new FormData();
       formData.append("resume", selectedFile);
-      fetch("http://localhost:5000/api/user/upload-resume", {
+      fetch(API_URLS.UPLOAD_RESUME, {
         method: "POST",
         body: formData,
       })
@@ -130,38 +131,36 @@ export default function Dashboard() {
           </nav>
 
           {/* Divider + Logout */}
-          {/* Divider + Logout */}
-{sidebarOpen && (
-  <>
-    <hr className="border-t border-gray-700 my-3 mx-6" />
-    <div className="px-6 mb-8">
-      <button
-        onClick={handleLogout}
-        className={`
-          group
-          flex items-center gap-2 w-full
-          text-red-500 font-semibold text-base
-          px-0 py-2
-          rounded-md border border-transparent
-          transition-all duration-300 ease-out
-          outline-none
-        `}
-        style={{ justifyContent: "flex-start" }}
-      >
-        <LogOut
-          size={18}
-          className="transition-transform duration-300 ease-out group-hover:-translate-x-1"
-        />
-        <span
-          className="transition-colors duration-300 ease-out text-red-500"
-        >
-          Logout
-        </span>
-      </button>
-    </div>
-  </>
-)}
-
+          {sidebarOpen && (
+            <>
+              <hr className="border-t border-gray-700 my-3 mx-6" />
+              <div className="px-6 mb-8">
+                <button
+                  onClick={handleLogout}
+                  className={`
+                    group
+                    flex items-center gap-2 w-full
+                    text-red-500 font-semibold text-base
+                    px-0 py-2
+                    rounded-md border border-transparent
+                    transition-all duration-300 ease-out
+                    outline-none
+                  `}
+                  style={{ justifyContent: "flex-start" }}
+                >
+                  <LogOut
+                    size={18}
+                    className="transition-transform duration-300 ease-out group-hover:-translate-x-1"
+                  />
+                  <span
+                    className="transition-colors duration-300 ease-out text-red-500"
+                  >
+                    Logout
+                  </span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </aside>
 

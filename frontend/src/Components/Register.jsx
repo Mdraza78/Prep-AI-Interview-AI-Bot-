@@ -13,6 +13,7 @@ import {
   Feather,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { API_URLS } from '../config/api';
 
 // Main App component wrapping the Registration form
 export default function App() {
@@ -79,7 +80,7 @@ function RegisterForm({ onRegisterSuccess }) {
         password: form.password,
       };
 
-      const res = await axios.post('http://localhost:5000/api/user/register', postData);
+      const res = await axios.post(API_URLS.REGISTER, postData);
 
       setMsg(res.data.msg || 'Registration successful!');
       setForm({

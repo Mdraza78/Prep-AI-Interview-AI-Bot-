@@ -10,6 +10,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { API_URLS } from '../config/api';
 
 export default function Login({ onLoginSuccess }) {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -23,33 +24,31 @@ export default function Login({ onLoginSuccess }) {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
- // In your Login.jsx handleSubmit function:
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');
-  setMsg('');
-  setLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setMsg('');
+    setLoading(true);
 
-  try {
-    const res = await axios.post('http://localhost:5000/api/user/login', form);
-    // Clear any existing data first
-    localStorage.clear();
-    
-    // Store new data
-    localStorage.setItem('token', res.data.token);
-    localStorage.setItem('userId', res.data.userId);
-    localStorage.setItem('name', res.data.name);
-    
-    setMsg('Login successful!');
-    if (onLoginSuccess) onLoginSuccess(res.data.name);
-    navigate('/dashboard');
-  } catch (err) {
-    setError(err.response?.data?.error || 'Login failed');
-  } finally {
-    setLoading(false);
-  }
-};
-
+    try {
+      const res = await axios.post(API_URLS.LOGIN, form);
+      // Clear any existing data first
+      localStorage.clear();
+      
+      // Store new data
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('userId', res.data.userId);
+      localStorage.setItem('name', res.data.name);
+      
+      setMsg('Login successful!');
+      if (onLoginSuccess) onLoginSuccess(res.data.name);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">

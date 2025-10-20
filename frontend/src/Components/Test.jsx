@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Bot, Mic, MicOff, Volume2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { API_URLS } from "../config/api";
 
 const BORDER_COLOR = "#238636";
 
@@ -144,7 +145,7 @@ export default function Test() {
           return;
         }
         const res = await fetch(
-          "http://localhost:5000/api/user/start-interview",
+          API_URLS.START_INTERVIEW,
           {
             method: "POST",
             headers: {
@@ -281,7 +282,7 @@ export default function Test() {
     setIsSubmitting(true);
     try {
       const resumeText = localStorage.getItem("resumeText");
-      const res = await fetch("http://localhost:5000/api/user/evaluate-test", {
+      const res = await fetch(API_URLS.EVALUATE_TEST, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
