@@ -6,15 +6,13 @@ const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 
-// FIX: Update CORS for production
 app.use(cors({
   origin: [
-    'https://prep-ai-interview-ai-bot.vercel.app', // Your Vercel URL
-    'http://localhost:5173' // Vite dev server
+    'https://prep-ai-interview-ai-bot.vercel.app', // Your ACTUAL Vercel URL
+    'http://localhost:5173'
   ],
   credentials: true
 }));
-
 app.use(express.json());
 
 // FIX: Add proper MongoDB connection options
