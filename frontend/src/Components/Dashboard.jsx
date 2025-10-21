@@ -10,6 +10,7 @@ import {
   CheckCircle,
   Trophy,
   LogOut,
+  X
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import UserProfile from "./UserProfile";
@@ -35,7 +36,7 @@ const menuItems = [
 ];
 
 export default function Dashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [file, setFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef();
@@ -79,6 +80,11 @@ export default function Dashboard() {
     }
   };
 
+  const handleMenuClick = (label) => {
+    setCurrentPage(label);
+    setSidebarOpen(false); // Close sidebar on mobile after selection
+  };
+
   return (
     <div className="flex h-screen bg-gray-900 text-gray-300 font-sans">
       {/* Animations */}
@@ -89,31 +95,47 @@ export default function Dashboard() {
         }
       `}</style>
 
-      {/* Sidebar */}
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Mobile Full Screen */}
       <aside
-        className={`${sidebarOpen ? "w-72" : "w-0"} bg-gray-800 flex flex-col transition-all duration-300 overflow-hidden border-r border-gray-700`}
-        style={{ minWidth: sidebarOpen ? "18rem" : 0 }}
+        className={`fixed lg:relative inset-y-0 left-0 z-50 w-full lg:w-72 bg-gray-800 flex flex-col transition-transform duration-300 ease-in-out overflow-hidden border-r border-gray-700 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        }`}
       >
         <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center px-6 py-6" style={fadeSlideInStyle("0.05s")}>
-            <div className="bg-green-600 rounded-md p-2">
-              <Bot size={48} className="text-white" />
-            </div>
-            {sidebarOpen && (
+          {/* Logo and Close Button */}
+          <div className="flex items-center justify-between px-6 py-6" style={fadeSlideInStyle("0.05s")}>
+            <div className="flex items-center">
+              <div className="bg-green-600 rounded-md p-2">
+                <Bot size={48} className="text-white" />
+              </div>
               <div className="ml-3">
                 <h1 className="text-2xl font-bold text-white mb-0">Prep Mind</h1>
                 <p className="text-gray-400 text-xs">Smart Preparation</p>
               </div>
-            )}
+            </div>
+            {/* Close button for mobile */}
+            <button
+              className="lg:hidden p-2 text-gray-400 hover:text-white"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X size={24} />
+            </button>
           </div>
 
-          {/* Menu items - spaced down */}
+          {/* Menu items */}
           <nav className="flex flex-col gap-1 flex-1 mt-8">
             {menuItems.map(({ icon: Icon, label }, idx) => (
               <button
                 key={idx}
-                onClick={() => setCurrentPage(label)}
+                onClick={() => handleMenuClick(label)}
                 style={fadeSlideInStyle(`${0.15 + idx * 0.1}s`)}
                 className={`flex items-center gap-4 px-6 py-3 text-base rounded-md font-medium transition-colors ${
                   currentPage === label
@@ -125,104 +147,105 @@ export default function Dashboard() {
                   size={20}
                   className={currentPage === label ? "text-white" : "text-green-500"}
                 />
-                {sidebarOpen && <span>{label}</span>}
+                <span>{label}</span>
               </button>
             ))}
           </nav>
 
           {/* Divider + Logout */}
-          {sidebarOpen && (
-            <>
-              <hr className="border-t border-gray-700 my-3 mx-6" />
-              <div className="px-6 mb-8">
-                <button
-                  onClick={handleLogout}
-                  className={`
-                    group
-                    flex items-center gap-2 w-full
-                    text-red-500 font-semibold text-base
-                    px-0 py-2
-                    rounded-md border border-transparent
-                    transition-all duration-300 ease-out
-                    outline-none
-                  `}
-                  style={{ justifyContent: "flex-start" }}
+          <div className="mt-auto">
+            <hr className="border-t border-gray-700 my-3 mx-6" />
+            <div className="px-6 mb-8">
+              <button
+                onClick={handleLogout}
+                className={`
+                  group
+                  flex items-center gap-2 w-full
+                  text-red-500 font-semibold text-base
+                  px-0 py-2
+                  rounded-md border border-transparent
+                  transition-all duration-300 ease-out
+                  outline-none
+                `}
+                style={{ justifyContent: "flex-start" }}
+              >
+                <LogOut
+                  size={18}
+                  className="transition-transform duration-300 ease-out group-hover:-translate-x-1"
+                />
+                <span
+                  className="transition-colors duration-300 ease-out text-red-500"
                 >
-                  <LogOut
-                    size={18}
-                    className="transition-transform duration-300 ease-out group-hover:-translate-x-1"
-                  />
-                  <span
-                    className="transition-colors duration-300 ease-out text-red-500"
-                  >
-                    Logout
-                  </span>
-                </button>
-              </div>
-            </>
-          )}
+                  Logout
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
       </aside>
 
       {/* Main content */}
-      <div className="flex flex-col flex-grow h-screen overflow-hidden">
+      <div className="flex flex-col flex-grow h-screen overflow-hidden w-full">
         {/* Navbar */}
         <div
-          className="flex items-center justify-between px-10 bg-gray-900"
+          className="flex items-center justify-between px-4 sm:px-6 lg:px-10 bg-gray-900"
           style={{ height: 70, minHeight: 70, ...fadeSlideInStyle("0.15s") }}
         >
           <button
-            className="p-2 rounded hover:bg-gray-800"
-            onClick={() => setSidebarOpen((open) => !open)}
+            className="p-2 rounded hover:bg-gray-800 lg:hidden"
+            onClick={() => setSidebarOpen(true)}
             aria-label="Toggle sidebar"
           >
-            <Menu size={32} className="text-white" />
+            <Menu size={24} className="text-white" />
           </button>
-          <span className="text-white font-semibold text-base ml-auto">
+          <span className="text-white font-semibold text-base lg:ml-auto text-center flex-1 lg:flex-none">
             Hello, {userName}
           </span>
+          {/* Spacer for mobile to center the text */}
+          <div className="w-10 lg:hidden" />
         </div>
         <hr className="border-gray-700" />
 
         {/* Page Content */}
-        <main className="overflow-auto bg-gray-900 p-10 flex-grow">
-          <div className="max-w-3xl mx-auto">
+        <main className="overflow-auto bg-gray-900 p-4 sm:p-6 lg:p-10 flex-grow">
+          <div className="max-w-3xl mx-auto w-full">
             {currentPage === "Upload Resume" && (
               <>
                 {/* Upload Resume Section */}
-                <div className="flex justify-between items-center mb-8" style={fadeSlideInStyle("0.22s")}>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                      <Upload size={28} className="text-green-500" />
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8" style={fadeSlideInStyle("0.22s")}>
+                  <div className="flex-1">
+                    <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-3 mb-2">
+                      <Upload size={24} className="text-green-500" />
                       Upload Resume
                     </h2>
-                    <p className="text-gray-400">
+                    <p className="text-gray-400 text-sm sm:text-base">
                       Upload your resume and let AI analyze it for interview preparation
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <FileText size={18} />
+                  <div className="flex items-center gap-2 text-gray-400 text-sm sm:text-base">
+                    <FileText size={16} />
                     <span>PDF format only</span>
                   </div>
                 </div>
+                
                 <form onSubmit={(e) => e.preventDefault()}>
                   <div
                     style={fadeSlideInStyle("0.32s")}
                     className={`rounded-xl border-2 border-dashed ${
                       dragActive ? "border-green-400 bg-gray-700/60" : "border-gray-600 bg-gray-700/40"
-                    } flex flex-col items-center justify-center cursor-pointer py-10`}
+                    } flex flex-col items-center justify-center cursor-pointer py-8 sm:py-10 px-4`}
                     onDragOver={onDragOver}
                     onDragLeave={onDragLeave}
                     onDrop={onDrop}
                     onClick={() => inputRef.current.click()}
                   >
-                    <div className="bg-green-600 rounded-full p-4 mb-3 animate-pulse">
-                      <Plus size={40} className="text-white" />
+                    <div className="bg-green-600 rounded-full p-3 sm:p-4 mb-3 animate-pulse">
+                      <Plus size={32} className="text-white" />
                     </div>
-                    <div className="mb-2 text-xl font-semibold text-white">
+                    <div className="mb-2 text-lg sm:text-xl font-semibold text-white text-center">
                       {file ? file.name : "Drop your resume here"}
                     </div>
-                    <div className="mb-3 text-gray-400">
+                    <div className="mb-3 text-gray-400 text-sm sm:text-base text-center">
                       or{" "}
                       <span
                         className="cursor-pointer underline"
@@ -235,7 +258,7 @@ export default function Dashboard() {
                       </span>{" "}
                       to upload
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 text-center">
                       Supports PDF files up to 10MB
                     </div>
                     <input
@@ -246,23 +269,25 @@ export default function Dashboard() {
                       className="hidden"
                     />
                   </div>
+                  
                   {file && (
                     <div className="mt-6 flex justify-end" style={fadeSlideInStyle("0.38s")}>
                       <button
                         type="button"
                         onClick={() => navigate("/test")}
-                        className="px-3 py-2 text-sm font-semibold bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+                        className="px-4 py-2 sm:px-6 sm:py-2 text-sm sm:text-base font-semibold bg-green-600 text-white rounded-md hover:bg-green-700 transition w-full sm:w-auto"
                       >
                         Start Interview
                       </button>
                     </div>
                   )}
                 </form>
+                
                 {/* Guidelines */}
-                <div style={fadeSlideInStyle("0.48s")} className="mt-10">
-                  <hr className="border-gray-700 mb-6" />
-                  <h3 className="mb-4 text-xl font-semibold text-white">Upload Guidelines</h3>
-                  <ul className="space-y-3">
+                <div style={fadeSlideInStyle("0.48s")} className="mt-8 sm:mt-10">
+                  <hr className="border-gray-700 mb-4 sm:mb-6" />
+                  <h3 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold text-white">Upload Guidelines</h3>
+                  <ul className="space-y-2 sm:space-y-3">
                     {[
                       "Use a professional, well-formatted PDF resume",
                       "Include relevant work experience and skills",
@@ -271,11 +296,11 @@ export default function Dashboard() {
                     ].map((text, index) => (
                       <li
                         key={index}
-                        className="text-gray-400 flex items-center gap-2"
+                        className="text-gray-400 flex items-start gap-2 text-sm sm:text-base"
                         style={fadeSlideInStyle(`${0.52 + index * 0.04}s`)}
                       >
-                        <CheckCircle size={16} className="text-green-500" />
-                        {text}
+                        <CheckCircle size={16} className="text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>{text}</span>
                       </li>
                     ))}
                   </ul>
@@ -286,11 +311,15 @@ export default function Dashboard() {
             {currentPage === "Account" && <UserProfile />}
             {currentPage === "Leaderboard" && <Leaderboard />}
           </div>
-          <div className="max-w-3xl mx-auto mt-20" style={fadeSlideInStyle("0.7s")}>
+          
+          {/* Footer */}
+          <div className="max-w-3xl mx-auto mt-12 sm:mt-20" style={fadeSlideInStyle("0.7s")}>
             <hr className="border-gray-700 mb-4" />
             <footer className="text-center text-xs text-gray-500">
               © 2025 Prep Mind. All rights reserved.
-              <br /><br />Made with ❤️ by Md Raza.
+              <br className="sm:hidden" />
+              <br className="sm:hidden" />
+              Made with ❤️ by Md Raza.
             </footer>
           </div>
         </main>
