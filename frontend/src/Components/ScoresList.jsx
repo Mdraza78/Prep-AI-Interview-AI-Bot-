@@ -71,7 +71,7 @@ export default function ScoresList() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-500 mb-4"></div>
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-600 mb-4"></div>
         <p className="text-gray-300 text-lg font-medium">Loading your test history...</p>
         <p className="text-gray-400 text-sm mt-2">Please wait</p>
       </div>
@@ -81,8 +81,8 @@ export default function ScoresList() {
   if (error) {
     return (
       <div className="text-center py-20">
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 max-w-md mx-auto">
-          <div className="text-red-400 text-lg font-semibold mb-2">Error Loading Results</div>
+        <div className="bg-red-600/10 border border-red-600/30 rounded-xl p-6 max-w-md mx-auto">
+          <div className="text-red-500 text-lg font-semibold mb-2">Error Loading Results</div>
           <div className="text-gray-300">{error}</div>
         </div>
       </div>
@@ -92,8 +92,8 @@ export default function ScoresList() {
   if (!results.length) {
     return (
       <div className="text-center py-20">
-        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-8 max-w-md mx-auto">
-          <FileText className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+        <div className="bg-gray-800/60 border border-gray-600 rounded-xl p-8 max-w-md mx-auto">
+          <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <div className="text-gray-300 text-lg font-medium mb-2">No Test History Found</div>
           <div className="text-gray-400 text-sm">Complete your first interview to see results here</div>
         </div>
@@ -145,7 +145,7 @@ export default function ScoresList() {
             {/* Header */}
             <div className="mb-8 text-center" style={fadeSlideInStyle("0.1s")}>
               <div className="flex items-center justify-center gap-3 mb-3">
-                <BarChart3 className="w-8 h-8 text-emerald-400" />
+                <BarChart3 className="w-8 h-8 text-emerald-600" />
                 <h1 className="text-3xl font-bold text-white">Test Results</h1>
               </div>
               <p className="text-gray-400">Track your interview performance and progress</p>
@@ -156,11 +156,11 @@ export default function ScoresList() {
               {/* Total Tests */}
               <div
                 style={fadeSlideInStyle("0.2s")}
-                className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:scale-105"
+                className="bg-gray-800/70 backdrop-blur-sm border border-gray-600 rounded-xl p-6 hover:border-emerald-700/50 transition-all duration-300 hover:scale-105"
               >
                 <div className="flex items-center gap-4">
-                  <div className="bg-emerald-500/10 rounded-lg p-3">
-                    <TrendingUp className="w-6 h-6 text-emerald-400" />
+                  <div className="bg-emerald-600/20 rounded-lg p-3">
+                    <TrendingUp className="w-6 h-6 text-emerald-500" />
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-white">{totalTests}</div>
@@ -172,11 +172,11 @@ export default function ScoresList() {
               {/* Average Score */}
               <div
                 style={fadeSlideInStyle("0.3s")}
-                className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:scale-105"
+                className="bg-gray-800/70 backdrop-blur-sm border border-gray-600 rounded-xl p-6 hover:border-emerald-700/50 transition-all duration-300 hover:scale-105"
               >
                 <div className="flex items-center gap-4">
-                  <div className="bg-emerald-500/10 rounded-lg p-3">
-                    <Target className="w-6 h-6 text-emerald-400" />
+                  <div className="bg-emerald-600/20 rounded-lg p-3">
+                    <Target className="w-6 h-6 text-emerald-500" />
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-white">{averageScore}</div>
@@ -188,11 +188,11 @@ export default function ScoresList() {
               {/* Best Score */}
               <div
                 style={fadeSlideInStyle("0.4s")}
-                className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:scale-105"
+                className="bg-gray-800/70 backdrop-blur-sm border border-gray-600 rounded-xl p-6 hover:border-emerald-700/50 transition-all duration-300 hover:scale-105"
               >
                 <div className="flex items-center gap-4">
-                  <div className="bg-emerald-500/10 rounded-lg p-3">
-                    <Award className="w-6 h-6 text-emerald-400" />
+                  <div className="bg-emerald-600/20 rounded-lg p-3">
+                    <Award className="w-6 h-6 text-emerald-500" />
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-white">{bestScore}</div>
@@ -203,9 +203,9 @@ export default function ScoresList() {
             </div>
 
             {/* Attempts List */}
-            <div className="bg-gray-800/30 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-600 rounded-xl p-6">
               <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-emerald-400" />
+                <FileText className="w-5 h-5 text-emerald-500" />
                 Recent Test Results
               </h2>
               
@@ -219,17 +219,17 @@ export default function ScoresList() {
                     <div
                       key={attempt._id || idx}
                       style={fadeSlideInStyle(`${0.1 * (idx + 1)}s`)}
-                      className="bg-gray-800/50 border border-gray-700 rounded-lg p-5 hover:border-emerald-500/30 transition-all duration-300"
+                      className="bg-gray-800/60 border border-gray-600 rounded-lg p-5 hover:border-emerald-700/50 transition-all duration-300"
                     >
                       <div className="flex flex-col gap-4">
                         {/* Header Row - Mobile Optimized */}
                         <div className="flex justify-between items-start">
-                          <div className="bg-emerald-500/10 rounded-lg px-3 py-1">
+                          <div className="bg-emerald-600/20 rounded-lg px-3 py-1">
                             <span className="text-emerald-400 font-semibold text-sm">
                               Attempt #{attemptNumber}
                             </span>
                           </div>
-                          <div className="text-2xl font-bold text-emerald-400 text-right">
+                          <div className="text-2xl font-bold text-emerald-500 text-right">
                             {percentage}%
                           </div>
                         </div>
@@ -237,18 +237,18 @@ export default function ScoresList() {
                         {/* Date and Time */}
                         <div className="flex flex-wrap gap-4 text-sm text-gray-400">
                           <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
+                            <Calendar className="w-4 h-4 text-gray-500" />
                             <span>{datePart}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
+                            <Clock className="w-4 h-4 text-gray-500" />
                             <span>{timePart}</span>
                           </div>
                         </div>
                         
                         {/* Score */}
                         <div className="flex items-center gap-2 text-sm">
-                          <Target className="w-4 h-4 text-emerald-400" />
+                          <Target className="w-4 h-4 text-emerald-500" />
                           <span className="text-gray-300">
                             {attempt.totalScore} out of 100 points
                           </span>
@@ -258,7 +258,7 @@ export default function ScoresList() {
                         <div className="flex justify-center mt-2">
                           <button
                             onClick={() => setActiveDetailAttempt(attempt)}
-                            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 font-medium w-full sm:w-auto justify-center"
+                            className="flex items-center gap-2 px-6 py-3 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg transition-colors duration-200 font-medium w-full sm:w-auto justify-center"
                           >
                             <Eye className="w-4 h-4" />
                             <span>View Details</span>
@@ -272,7 +272,7 @@ export default function ScoresList() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-gray-700">
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-gray-600">
                   <div className="text-gray-400 text-sm">
                     Showing {startIndex + 1}-{Math.min(startIndex + attemptsPerPage, attemptsSorted.length)} of {attemptsSorted.length} attempts
                   </div>
@@ -284,7 +284,7 @@ export default function ScoresList() {
                       className={`p-2 rounded-lg transition-colors duration-200 ${
                         currentPage === 1
                           ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                          : "bg-emerald-600 text-white hover:bg-emerald-700"
+                          : "bg-emerald-700 text-white hover:bg-emerald-600"
                       }`}
                     >
                       <ChevronLeft className="w-5 h-5" />
@@ -297,7 +297,7 @@ export default function ScoresList() {
                           onClick={() => setCurrentPage(page)}
                           className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors duration-200 ${
                             currentPage === page
-                              ? "bg-emerald-600 text-white"
+                              ? "bg-emerald-700 text-white"
                               : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                           }`}
                         >
@@ -312,7 +312,7 @@ export default function ScoresList() {
                       className={`p-2 rounded-lg transition-colors duration-200 ${
                         currentPage === totalPages
                           ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                          : "bg-emerald-600 text-white hover:bg-emerald-700"
+                          : "bg-emerald-700 text-white hover:bg-emerald-600"
                       }`}
                     >
                       <ChevronRight className="w-5 h-5" />
@@ -327,10 +327,10 @@ export default function ScoresList() {
           <div className="max-w-4xl mx-auto">
             <div
               style={fadeSlideInStyle("0.1s")}
-              className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-4 sm:p-6"
+              className="bg-gray-800/60 backdrop-blur-sm border border-gray-600 rounded-xl p-4 sm:p-6"
             >
               {/* Professional Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-700">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-600">
                 <button
                   onClick={() => setActiveDetailAttempt(null)}
                   className="flex items-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200 w-full sm:w-auto justify-center sm:justify-start order-2 sm:order-1"
@@ -341,8 +341,8 @@ export default function ScoresList() {
                 
                 <div className="text-center order-1 sm:order-2">
                   <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">Attempt Details</h3>
-                  <div className="bg-emerald-500/20 border border-emerald-500/30 rounded-full px-4 py-2">
-                    <div className="text-emerald-300 text-lg font-semibold">
+                  <div className="bg-emerald-700/30 border border-emerald-600/50 rounded-full px-4 py-2">
+                    <div className="text-emerald-400 text-lg font-semibold">
                       Score: {activeDetailAttempt.totalScore}/100
                     </div>
                   </div>
@@ -357,15 +357,15 @@ export default function ScoresList() {
                   <div
                     key={qidx}
                     style={fadeSlideInStyle(`${0.1 * (qidx + 1)}s`)}
-                    className="bg-gray-800/30 border border-gray-700 rounded-lg overflow-hidden"
+                    className="bg-gray-800/40 border border-gray-600 rounded-lg overflow-hidden"
                   >
                     {/* Question Header */}
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center px-4 py-3 bg-gray-700/50 border-b border-gray-600 gap-2">
-                      <span className="text-emerald-300 font-semibold flex items-center gap-2">
-                        <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center px-4 py-3 bg-gray-700/60 border-b border-gray-600 gap-2">
+                      <span className="text-emerald-400 font-semibold flex items-center gap-2">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
                         Question {qidx + 1}
                       </span>
-                      <span className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-sm font-semibold w-fit">
+                      <span className="bg-emerald-700/30 text-emerald-400 px-3 py-1 rounded-full text-sm font-semibold w-fit border border-emerald-600/50">
                         {q.individualScore} / 20
                       </span>
                     </div>
@@ -374,14 +374,14 @@ export default function ScoresList() {
                     <div className="p-4 space-y-4">
                       <div>
                         <div className="text-gray-400 text-sm font-medium mb-2">Question:</div>
-                        <div className="text-white bg-gray-800/50 rounded-lg p-3 border border-gray-700 text-sm sm:text-base">
+                        <div className="text-white bg-gray-800/60 rounded-lg p-3 border border-gray-600 text-sm sm:text-base">
                           {q.question}
                         </div>
                       </div>
                       
                       <div>
                         <div className="text-gray-400 text-sm font-medium mb-2">Your Answer:</div>
-                        <div className="text-gray-300 bg-gray-800/30 rounded-lg p-3 border border-gray-700 text-sm sm:text-base">
+                        <div className="text-gray-300 bg-gray-800/40 rounded-lg p-3 border border-gray-600 text-sm sm:text-base">
                           {q.answer || "No answer provided"}
                         </div>
                       </div>
@@ -389,7 +389,7 @@ export default function ScoresList() {
                       {q.feedback && (
                         <div>
                           <div className="text-gray-400 text-sm font-medium mb-2">Feedback:</div>
-                          <div className="text-amber-300 bg-amber-500/10 rounded-lg p-3 border border-amber-500/20 italic text-sm sm:text-base">
+                          <div className="text-amber-400 bg-amber-600/10 rounded-lg p-3 border border-amber-600/30 italic text-sm sm:text-base">
                             {q.feedback}
                           </div>
                         </div>
