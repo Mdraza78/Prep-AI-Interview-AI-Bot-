@@ -221,45 +221,49 @@ export default function ScoresList() {
                       style={fadeSlideInStyle(`${0.1 * (idx + 1)}s`)}
                       className="bg-gray-800/50 border border-gray-700 rounded-lg p-5 hover:border-emerald-500/30 transition-all duration-300"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="bg-emerald-500/10 rounded-lg px-3 py-1">
-                              <span className="text-emerald-400 font-semibold text-sm">
-                                Attempt #{attemptNumber}
-                              </span>
-                            </div>
-                            <div className="text-2xl font-bold text-emerald-400">
-                              {percentage}%
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-wrap gap-4 text-sm text-gray-400 mb-3">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              <span>{datePart}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              <span>{timePart}</span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 text-sm">
-                            <Target className="w-4 h-4 text-emerald-400" />
-                            <span className="text-gray-300">
-                              {attempt.totalScore} out of 100 points
+                      <div className="flex flex-col gap-4">
+                        {/* Header Row - Mobile Optimized */}
+                        <div className="flex justify-between items-start">
+                          <div className="bg-emerald-500/10 rounded-lg px-3 py-1">
+                            <span className="text-emerald-400 font-semibold text-sm">
+                              Attempt #{attemptNumber}
                             </span>
+                          </div>
+                          <div className="text-2xl font-bold text-emerald-400 text-right">
+                            {percentage}%
                           </div>
                         </div>
                         
-                        <button
-                          onClick={() => setActiveDetailAttempt(attempt)}
-                          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 font-medium"
-                        >
-                          <Eye className="w-4 h-4" />
-                          <span>View Details</span>
-                        </button>
+                        {/* Date and Time */}
+                        <div className="flex flex-wrap gap-4 text-sm text-gray-400">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            <span>{datePart}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{timePart}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Score */}
+                        <div className="flex items-center gap-2 text-sm">
+                          <Target className="w-4 h-4 text-emerald-400" />
+                          <span className="text-gray-300">
+                            {attempt.totalScore} out of 100 points
+                          </span>
+                        </div>
+                        
+                        {/* View Details Button - Centered with Icon */}
+                        <div className="flex justify-center mt-2">
+                          <button
+                            onClick={() => setActiveDetailAttempt(attempt)}
+                            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 font-medium w-full sm:w-auto justify-center"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span>View Details</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -319,28 +323,32 @@ export default function ScoresList() {
             </div>
           </>
         ) : (
-          // Detail View
+          // Detail View - Mobile Optimized
           <div className="max-w-4xl mx-auto">
             <div
               style={fadeSlideInStyle("0.1s")}
-              className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6"
+              className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-4 sm:p-6"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
+              {/* Professional Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-700">
                 <button
                   onClick={() => setActiveDetailAttempt(null)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200"
+                  className="flex items-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200 w-full sm:w-auto justify-center sm:justify-start order-2 sm:order-1"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Back to Results</span>
                 </button>
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold text-white">Attempt Details</h3>
-                  <div className="text-emerald-400 text-lg font-semibold mt-1">
-                    Score: {activeDetailAttempt.totalScore}/100
+                
+                <div className="text-center order-1 sm:order-2">
+                  <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">Attempt Details</h3>
+                  <div className="bg-emerald-500/20 border border-emerald-500/30 rounded-full px-4 py-2">
+                    <div className="text-emerald-300 text-lg font-semibold">
+                      Score: {activeDetailAttempt.totalScore}/100
+                    </div>
                   </div>
                 </div>
-                <div className="w-20"></div> {/* Spacer for alignment */}
+                
+                <div className="w-full sm:w-20 order-3 sm:order-3"></div> {/* Spacer for alignment */}
               </div>
 
               {/* Questions List */}
@@ -352,12 +360,12 @@ export default function ScoresList() {
                     className="bg-gray-800/30 border border-gray-700 rounded-lg overflow-hidden"
                   >
                     {/* Question Header */}
-                    <div className="flex justify-between items-center px-4 py-3 bg-gray-700/50 border-b border-gray-600">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center px-4 py-3 bg-gray-700/50 border-b border-gray-600 gap-2">
                       <span className="text-emerald-300 font-semibold flex items-center gap-2">
                         <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
                         Question {qidx + 1}
                       </span>
-                      <span className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-sm font-semibold">
+                      <span className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-sm font-semibold w-fit">
                         {q.individualScore} / 20
                       </span>
                     </div>
@@ -366,14 +374,14 @@ export default function ScoresList() {
                     <div className="p-4 space-y-4">
                       <div>
                         <div className="text-gray-400 text-sm font-medium mb-2">Question:</div>
-                        <div className="text-white bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                        <div className="text-white bg-gray-800/50 rounded-lg p-3 border border-gray-700 text-sm sm:text-base">
                           {q.question}
                         </div>
                       </div>
                       
                       <div>
                         <div className="text-gray-400 text-sm font-medium mb-2">Your Answer:</div>
-                        <div className="text-gray-300 bg-gray-800/30 rounded-lg p-3 border border-gray-700">
+                        <div className="text-gray-300 bg-gray-800/30 rounded-lg p-3 border border-gray-700 text-sm sm:text-base">
                           {q.answer || "No answer provided"}
                         </div>
                       </div>
@@ -381,7 +389,7 @@ export default function ScoresList() {
                       {q.feedback && (
                         <div>
                           <div className="text-gray-400 text-sm font-medium mb-2">Feedback:</div>
-                          <div className="text-amber-300 bg-amber-500/10 rounded-lg p-3 border border-amber-500/20 italic">
+                          <div className="text-amber-300 bg-amber-500/10 rounded-lg p-3 border border-amber-500/20 italic text-sm sm:text-base">
                             {q.feedback}
                           </div>
                         </div>
