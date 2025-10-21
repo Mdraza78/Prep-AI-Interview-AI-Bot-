@@ -114,69 +114,79 @@ export default function LandingPage() {
       `}</style>
 
       {/* Header - Fixed for mobile */}
-      <header className="w-full bg-gray-900 border-b border-gray-800 p-3 sm:p-4 flex 
-      items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-2 sm:gap-3" style={fadeSlideInStyle("0.05s")}>
-          <div className="bg-green-600 rounded-md p-1 sm:p-2">
-            <Bot size={28} className="text-white sm:w-9 sm:h-9" />
-          </div>
-          <div className="flex flex-col">
-            <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight">Prep Mind</h1>
-            <p className="text-gray-400 text-xs hidden sm:block">Smart Preparation</p>
-          </div>
-        </div>
+      
+<header className="w-full bg-gray-900 border-b border-gray-800 p-3 sm:p-4 flex 
+items-center justify-between sticky top-0 z-50">
+  <div className="flex items-center gap-2 sm:gap-3" style={fadeSlideInStyle("0.05s")}>
+    <div className="bg-green-600 rounded-md p-1 sm:p-2">
+      <Bot size={28} className="text-white sm:w-9 sm:h-9" />
+    </div>
+    <div className="flex flex-col">
+      <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight">Prep Mind</h1>
+      <p className="text-gray-400 text-xs sm:text-xs">Smart Preparation</p> {/* Changed this line */}
+    </div>
+  </div>
 
-        <button
-          onClick={() => navigate("/register")}
-          className="px-4 py-2 sm:px-6 sm:py-2 rounded-md font-semibold bg-green-600
-          text-white hover:bg-green-700 transition-all duration-300 ease-in-out
-          transform hover:scale-105 text-sm sm:text-base whitespace-nowrap"
-        >
-          Get Started
-        </button>
-      </header>
+  <button
+    onClick={() => navigate("/register")}
+    className="px-4 py-2 sm:px-6 sm:py-2 rounded-md font-semibold bg-green-600
+    text-white hover:bg-green-700 transition-all duration-300 ease-in-out
+    transform hover:scale-105 text-sm sm:text-base whitespace-nowrap"
+  >
+    Get Started
+  </button>
+</header>
 
       {/* Main Content */}
       <main className="flex flex-col items-center px-4 sm:px-6 py-8 sm:py-12 gap-12 sm:gap-16 flex-1">
 
         {/* Hero Section */}
-        <div className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16 w-full max-w-6xl">
-          {/* Text Content */}
-          <div
-            className="flex flex-col text-center lg:text-left w-full lg:w-1/2"
-            style={fadeSlideInStyle("0.25s")}
-          >
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight text-white mb-4 sm:mb-6">
-              Master Your Interview Skills with{" "}
-              <span className="text-green-500">Prep-Mind</span>
-            </h1>
-            <p className="text-gray-400 text-base sm:text-lg leading-relaxed mb-6 sm:mb-8 max-w-2xl mx-auto lg:mx-0">
-              Upload your resume, practice with AI-generated questions, and track your
-              progress. Prep Mind helps you ace your interviews with personalized feedback
-              and realistic practice sessions.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start">
-              <button
-                onClick={() => navigate("/login")}
-                className="px-6 py-3 sm:px-8 sm:py-3 rounded-md font-semibold bg-green-600 text-white
-                hover:bg-green-700 transition-all duration-300 ease-in-out transform
-                hover:scale-105 text-base sm:text-lg w-full sm:w-auto"
-              >
-                Start Practicing Now
-              </button>
-            </div>
-          </div>
+       {/* Hero Section */}
+<div className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16 w-full max-w-6xl mt-8 sm:mt-0">
+  {/* Text Content */}
+  <div
+    className="flex flex-col text-center lg:text-left w-full lg:w-1/2 pt-4 sm:pt-0"
+    style={fadeSlideInStyle("0.25s")}
+  >
+    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight text-white mb-4 sm:mb-6">
+      Master Your Interview Skills with{" "}
+      <span className="text-green-500">Prep-Mind</span>
+    </h1>
+    <p className="text-gray-400 text-base sm:text-lg leading-relaxed mb-6 sm:mb-8 max-w-2xl mx-auto lg:mx-0">
+      Upload your resume, practice with AI-generated questions, and track your
+      progress. Prep Mind helps you ace your interviews with personalized feedback
+      and realistic practice sessions.
+    </p>
+    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start">
+      <button
+        onClick={() => navigate("/login")}
+        className="px-6 py-3 sm:px-8 sm:py-3 rounded-md font-semibold bg-green-600 text-white
+        hover:bg-green-700 transition-all duration-300 ease-in-out transform
+        hover:scale-105 text-base sm:text-lg w-full sm:w-auto"
+      >
+        Start Practicing Now
+      </button>
+      <button
+        onClick={() => navigate("/register")}
+        className="px-6 py-3 sm:px-8 sm:py-3 rounded-md font-semibold bg-gray-700 text-white
+        hover:bg-gray-600 transition-all duration-300 ease-in-out transform
+        hover:scale-105 text-base sm:text-lg w-full sm:w-auto"
+      >
+        Create Account
+      </button>
+    </div>
+  </div>
 
-          {/* Image */}
-          <div className="flex-shrink-0 w-full lg:w-1/2 max-w-md" style={fadeSlideInStyle("0.35s")}>
-            <img
-              src="https://static.vecteezy.com/system/resources/thumbnails/044/278/766/small_2x/cute-ai-robot-chatbot-on-isolated-transparent-background-png.png"
-              alt="AI Robot"
-              className="w-full h-auto rounded-xl transition-transform
-              duration-300 ease-in-out hover:scale-105"
-            />
-          </div>
-        </div>
+  {/* Image */}
+  <div className="flex-shrink-0 w-full lg:w-1/2 max-w-md" style={fadeSlideInStyle("0.35s")}>
+    <img
+      src="https://static.vecteezy.com/system/resources/thumbnails/044/278/766/small_2x/cute-ai-robot-chatbot-on-isolated-transparent-background-png.png"
+      alt="AI Robot"
+      className="w-full h-auto rounded-xl transition-transform
+      duration-300 ease-in-out hover:scale-105"
+    />
+  </div>
+</div>
 
         {/* Section Heading */}
         <div
@@ -229,49 +239,67 @@ export default function LandingPage() {
         </div>
 
         {/* How It Works Section */}
-        <div ref={howItWorksRef} className="max-w-6xl w-full px-4 mt-12 sm:mt-20 flex flex-col items-center">
-          <h2
-            className={`text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 text-center transition-all duration-700 ${
-              hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20"
-            }`}
-          >
-            How Prep Mind Works
-          </h2>
-          <p
-            className={`text-gray-300 text-sm sm:text-base text-center mb-8 sm:mb-10 max-w-xl transition-all duration-700 delay-200 ${
-              hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20"
-            }`}
-          >
-            Simple, effective, and results-driven approach to interview preparation
-          </p>
+        {/* How It Works Section */}
+<div ref={howItWorksRef} className="max-w-6xl w-full px-4 mt-12 sm:mt-20 flex flex-col items-center">
+  <h2
+    className={`text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 text-center transition-all duration-700 ${
+      hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20"
+    }`}
+  >
+    How Prep Mind Works
+  </h2>
+  <p
+    className={`text-gray-300 text-sm sm:text-base text-center mb-8 sm:mb-10 max-w-xl transition-all duration-700 delay-200 ${
+      hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20"
+    }`}
+  >
+    Simple, effective, and results-driven approach to interview preparation
+  </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 w-full">
-            {[1, 2, 3].map((step, idx) => (
-              <div 
-                key={step}
-                className={`flex flex-col items-center text-center px-4 transition-all duration-700 delay-${300 + idx * 300} ${
-                  hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20"
-                }`}
-              >
-                <div className="bg-green-600 text-white w-12 h-12 sm:w-14 sm:h-14 rounded-full flex
-                items-center justify-center mb-4 text-xl sm:text-2xl font-bold shadow-md">
-                  {step}
-                </div>
-                <h3 className="font-semibold text-lg text-white mb-2">
-                  {step === 1 ? "Upload Your Resume" : step === 2 ? "Practice with Voice" : "Track & Improve"}
-                </h3>
-                <p className="text-gray-400 text-sm leading-relaxed">
-                  {step === 1 
-                    ? "Upload your resume in PDF format. Our AI analyzes your experience and skills to create personalized questions."
-                    : step === 2 
-                    ? "Answer AI-generated questions using your voice. Experience realistic interview scenarios with instant feedback."
-                    : "View detailed scores, get improvement suggestions, and climb the leaderboard to showcase your skills."
-                  }
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 w-full">
+    <div className={`flex flex-col items-center text-center px-4 transition-all duration-700 delay-300 ${
+      hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20"
+    }`}>
+      <div className="bg-green-600 text-white w-12 h-12 sm:w-14 sm:h-14 rounded-full flex
+      items-center justify-center mb-4 text-xl sm:text-2xl font-bold shadow-md">
+        1
+      </div>
+      <h3 className="font-semibold text-lg text-white mb-2">Upload Your Resume</h3>
+      <p className="text-gray-400 text-sm leading-relaxed">
+        Upload your resume in PDF format. Our AI analyzes your experience and skills to create personalized questions.
+      </p>
+    </div>
+
+    <div className={`flex flex-col items-center text-center px-4 transition-all duration-700 delay-600 ${
+      hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20"
+    }`}>
+      <div className="bg-green-600 text-white w-12 h-12 sm:w-14 sm:h-14 rounded-full flex
+      items-center justify-center mb-4 text-xl sm:text-2xl font-bold shadow-md">
+        2
+      </div>
+      <h3 className="font-semibold text-lg text-white mb-2">Practice with Voice</h3>
+      <p className="text-gray-400 text-sm leading-relaxed">
+        Answer AI-generated questions using your voice. Experience realistic interview scenarios with instant feedback.
+        <span className="block mt-2 text-green-400 text-xs font-medium">
+          🎤 Professional microphone or earphones recommended for best audio quality
+        </span>
+      </p>
+    </div>
+
+    <div className={`flex flex-col items-center text-center px-4 transition-all duration-700 delay-900 ${
+      hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20"
+    }`}>
+      <div className="bg-green-600 text-white w-12 h-12 sm:w-14 sm:h-14 rounded-full flex
+      items-center justify-center mb-4 text-xl sm:text-2xl font-bold shadow-md">
+        3
+      </div>
+      <h3 className="font-semibold text-lg text-white mb-2">Track & Improve</h3>
+      <p className="text-gray-400 text-sm leading-relaxed">
+        View detailed scores, get improvement suggestions, and climb the leaderboard to showcase your skills.
+      </p>
+    </div>
+  </div>
+</div>
       </main>
 
       {/* Footer */}
