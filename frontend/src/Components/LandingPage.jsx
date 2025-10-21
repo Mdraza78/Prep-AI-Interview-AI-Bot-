@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Bot, Upload, Mic, Trophy, TrendingUp} from "lucide-react";
+import { Bot, Upload, Mic, Trophy, TrendingUp } from "lucide-react";
 import Footer from "./Footer";
 import { useNavigate } from "react-router-dom";
 
@@ -15,12 +15,12 @@ const fadeSlideInStyle = (delay = "0s") => ({
 function FeatureCard({ icon, title, description, extraClass = "" }) {
   return (
     <div
-      className={`bg-gray-800 border border-gray-700 rounded-2xl p-6 flex flex-col items-start gap-3 
-      transition-transform duration-500 ease-in-out hover:scale-105 max-w-lg mx-auto ${extraClass}`}
+      className={`bg-gray-800 border border-gray-700 rounded-2xl p-4 sm:p-6 flex flex-col items-start gap-3 
+      transition-transform duration-500 ease-in-out hover:scale-105 w-full max-w-sm mx-auto ${extraClass}`}
     >
-      <div className="bg-gray-900 p-3 rounded-md mb-2">{icon}</div>
-      <h3 className="text-lg font-semibold text-white">{title}</h3>
-      <p className="text-gray-400 text-sm">{description}</p>
+      <div className="bg-gray-900 p-2 sm:p-3 rounded-md mb-1 sm:mb-2">{icon}</div>
+      <h3 className="text-base sm:text-lg font-semibold text-white">{title}</h3>
+      <p className="text-gray-400 text-xs sm:text-sm leading-relaxed">{description}</p>
     </div>
   );
 }
@@ -30,25 +30,25 @@ export default function LandingPage() {
 
   const cardsData = [
     {
-      icon: <Upload size={32} className="text-green-500" />,
+      icon: <Upload size={24} className="text-green-500 sm:w-8 sm:h-8" />,
       title: "Upload Resume",
       description:
         "Upload your resume and let our AI analyze your skills and experience to generate personalized interview questions.",
     },
     {
-      icon: <Mic size={32} className="text-green-500" />,
+      icon: <Mic size={24} className="text-green-500 sm:w-8 sm:h-8" />,
       title: "Voice Interview Practice",
       description:
         "Practice answering AI-generated questions using your voice for a realistic interview simulation.",
     },
     {
-      icon: <TrendingUp size={32} className="text-green-500" />,
+      icon: <TrendingUp size={24} className="text-green-500 sm:w-8 sm:h-8" />,
       title: "Performance Analytics",
       description:
         "Track your progress with detailed scoring and AI-powered feedback to improve continuously.",
     },
     {
-      icon: <Trophy size={32} className="text-green-500" />,
+      icon: <Trophy size={24} className="text-green-500 sm:w-8 sm:h-8" />,
       title: "Global Leaderboard",
       description:
         "Compete with others worldwide and showcase your interview skills on the global leaderboard.",
@@ -104,7 +104,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-gray-900 flex flex-col font-sans overflow-x-hidden">
       {/* Animation keyframes */}
       <style>{`
         @keyframes fadeSlideIn {
@@ -113,59 +113,54 @@ export default function LandingPage() {
         }
       `}</style>
 
-      {/* Header */}
-      <header className="w-full bg-gray-900 border-b border-gray-800 p-4 flex 
-      items-center justify-between max-w-7xl mx-auto px-12 sm:px-16">
-
-        <div className="flex flex-col items-start gap-1 ml-6" style={fadeSlideInStyle("0.05s")}>
-          <div className="flex items-center gap-2">
-            <div className="bg-green-600 rounded-md p-2">
-              <Bot size={36} className="text-white" />
-            </div>
-            <div className="ml-1">
-              <h1 className="text-2xl font-bold text-white mb-0">Prep Mind</h1>
-              <p className="text-gray-400 text-xs">Smart Preparation</p>
-            </div>
+      {/* Header - Fixed for mobile */}
+      <header className="w-full bg-gray-900 border-b border-gray-800 p-3 sm:p-4 flex 
+      items-center justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-2 sm:gap-3" style={fadeSlideInStyle("0.05s")}>
+          <div className="bg-green-600 rounded-md p-1 sm:p-2">
+            <Bot size={28} className="text-white sm:w-9 sm:h-9" />
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight">Prep Mind</h1>
+            <p className="text-gray-400 text-xs hidden sm:block">Smart Preparation</p>
           </div>
         </div>
 
         <button
           onClick={() => navigate("/register")}
-          className="mr-6 px-6 py-2 rounded-md font-semibold bg-green-600
-          text-white hover:bg-green-800 transition-all duration-700 ease-in-out
-          transform hover:scale-110 hover:-translate-y-[2px] text-base"
-       
+          className="px-4 py-2 sm:px-6 sm:py-2 rounded-md font-semibold bg-green-600
+          text-white hover:bg-green-700 transition-all duration-300 ease-in-out
+          transform hover:scale-105 text-sm sm:text-base whitespace-nowrap"
         >
           Get Started
         </button>
       </header>
 
-      {/* Main */}
-      <main className="flex flex-col items-center px-6 py-12 max-w-7xl mx-auto gap-16">
+      {/* Main Content */}
+      <main className="flex flex-col items-center px-4 sm:px-6 py-8 sm:py-12 gap-12 sm:gap-16 flex-1">
 
-        {/* Hero */}
-        <div className="flex flex-col md:flex-row items-center gap-16 w-full">
-          {/* Text */}
+        {/* Hero Section */}
+        <div className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16 w-full max-w-6xl">
+          {/* Text Content */}
           <div
-            className="flex flex-col max-w-xl text-left md:ml-auto md:mr-12"
+            className="flex flex-col text-center lg:text-left w-full lg:w-1/2"
             style={fadeSlideInStyle("0.25s")}
           >
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-medium leading-snug text-white mb-4">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight text-white mb-4 sm:mb-6">
               Master Your Interview Skills with{" "}
-              <span className="text-green-500 font-semibold">Prep-Mind</span>
+              <span className="text-green-500">Prep-Mind</span>
             </h1>
-            <br />
-            <p className="text-gray-400 text-base sm:text-lg font-normal leading-tight max-w-[30rem] mb-8">
+            <p className="text-gray-400 text-base sm:text-lg leading-relaxed mb-6 sm:mb-8 max-w-2xl mx-auto lg:mx-0">
               Upload your resume, practice with AI-generated questions, and track your
               progress. Prep Mind helps you ace your interviews with personalized feedback
               and realistic practice sessions.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start">
               <button
                 onClick={() => navigate("/login")}
-                className="px-7 py-3 rounded-md font-semibold bg-green-600 text-white
-                hover:bg-green-700 transition-all duration-500 ease-in-out transform
-                hover:scale-105 hover:-translate-y-[2px] text-base"
+                className="px-6 py-3 sm:px-8 sm:py-3 rounded-md font-semibold bg-green-600 text-white
+                hover:bg-green-700 transition-all duration-300 ease-in-out transform
+                hover:scale-105 text-base sm:text-lg w-full sm:w-auto"
               >
                 Start Practicing Now
               </button>
@@ -173,44 +168,44 @@ export default function LandingPage() {
           </div>
 
           {/* Image */}
-          <div className="flex-shrink-0 max-w-md" style={fadeSlideInStyle("0.35s")}>
+          <div className="flex-shrink-0 w-full lg:w-1/2 max-w-md" style={fadeSlideInStyle("0.35s")}>
             <img
               src="https://static.vecteezy.com/system/resources/thumbnails/044/278/766/small_2x/cute-ai-robot-chatbot-on-isolated-transparent-background-png.png"
               alt="AI Robot"
               className="w-full h-auto rounded-xl transition-transform
-              duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] hover:scale-105 hover:-translate-y-1"
+              duration-300 ease-in-out hover:scale-105"
             />
           </div>
         </div>
 
-        {/* Section Heading before cards with left→right animation */}
+        {/* Section Heading */}
         <div
           ref={sectionHeadingRef}
-          className="max-w-4xl text-center mx-auto mb-8 transition-all duration-700"
+          className="max-w-4xl text-center mx-auto mb-8 transition-all duration-700 w-full px-4"
         >
           <h2
-            className={`text-3xl font-bold text-white mb-3 transition-all duration-700 ${
+            className={`text-2xl sm:text-3xl font-bold text-white mb-3 transition-all duration-700 ${
               headingVisible
                 ? "opacity-100 translate-x-0"
-                : "opacity-0 -translate-x-20"
+                : "opacity-0 -translate-x-10 sm:-translate-x-20"
             }`}
           >
             Complete Interview Preparation Platform
           </h2>
           <p
-            className={`text-gray-400 text-lg max-w-xl mx-auto transition-all duration-700 delay-200 ${
+            className={`text-gray-400 text-base sm:text-lg max-w-xl mx-auto transition-all duration-700 delay-200 ${
               headingVisible
                 ? "opacity-100 translate-x-0"
-                : "opacity-0 -translate-x-20"
+                : "opacity-0 -translate-x-10 sm:-translate-x-20"
             }`}
           >
             Everything you need to succeed in your next interview, powered by advanced AI technology
           </p>
         </div>
 
-        {/* Cards */}
-        <div className="w-full flex justify-center" ref={cardsRef}>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-10">
+        {/* Features Grid */}
+        <div className="w-full max-w-6xl px-4" ref={cardsRef}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
             {cardsData.map((card, idx) => (
               <FeatureCard
                 key={idx}
@@ -219,84 +214,68 @@ export default function LandingPage() {
                 description={card.description}
                 extraClass={
                   `transition-all duration-700 ` +
-                  (cardsVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-20") +
+                  (cardsVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20") +
                   (idx === 0
                     ? " delay-200"
                     : idx === 1
-                    ? " delay-400"
+                    ? " delay-300"
                     : idx === 2
-                    ? " delay-600"
-                    : " delay-800")
+                    ? " delay-400"
+                    : " delay-500")
                 }
               />
             ))}
           </div>
         </div>
 
-        {/* How Prep Mind Works */}
-        <div ref={howItWorksRef} className="max-w-5xl w-full mx-auto mt-20 flex flex-col items-center">
+        {/* How It Works Section */}
+        <div ref={howItWorksRef} className="max-w-6xl w-full px-4 mt-12 sm:mt-20 flex flex-col items-center">
           <h2
-            className={`text-2xl md:text-3xl font-bold text-white mb-3 text-center transition-all duration-700 ${
-              hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-20"
+            className={`text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 text-center transition-all duration-700 ${
+              hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20"
             }`}
           >
             How Prep Mind Works
           </h2>
           <p
-            className={`text-gray-300 text-sm md:text-base text-center mb-10 max-w-xl transition-all duration-700 delay-200 ${
-              hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-20"
+            className={`text-gray-300 text-sm sm:text-base text-center mb-8 sm:mb-10 max-w-xl transition-all duration-700 delay-200 ${
+              hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20"
             }`}
           >
             Simple, effective, and results-driven approach to interview preparation
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-y-8 gap-x-8 w-full">
-            <div className={`flex flex-col items-center text-center px-4 transition-all duration-700 delay-300 ${
-              hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-20"
-            }`}>
-              <div className="bg-green-600 text-white w-14 h-14 rounded-full flex
-              items-center justify-center mb-5 text-2xl font-bold shadow-md">
-                1
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 w-full">
+            {[1, 2, 3].map((step, idx) => (
+              <div 
+                key={step}
+                className={`flex flex-col items-center text-center px-4 transition-all duration-700 delay-${300 + idx * 300} ${
+                  hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10 sm:-translate-x-20"
+                }`}
+              >
+                <div className="bg-green-600 text-white w-12 h-12 sm:w-14 sm:h-14 rounded-full flex
+                items-center justify-center mb-4 text-xl sm:text-2xl font-bold shadow-md">
+                  {step}
+                </div>
+                <h3 className="font-semibold text-lg text-white mb-2">
+                  {step === 1 ? "Upload Your Resume" : step === 2 ? "Practice with Voice" : "Track & Improve"}
+                </h3>
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  {step === 1 
+                    ? "Upload your resume in PDF format. Our AI analyzes your experience and skills to create personalized questions."
+                    : step === 2 
+                    ? "Answer AI-generated questions using your voice. Experience realistic interview scenarios with instant feedback."
+                    : "View detailed scores, get improvement suggestions, and climb the leaderboard to showcase your skills."
+                  }
+                </p>
               </div>
-              <h3 className="font-semibold text-lg text-white mb-2">Upload Your Resume</h3>
-              <p className="text-gray-400 text-sm text-justify">
-                Upload your resume in PDF format. Our AI analyzes your experience and skills to create personalized questions.
-              </p>
-            </div>
-
-            <div className={`flex flex-col items-center text-center px-4 transition-all duration-700 delay-600 ${
-              hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-20"
-            }`}>
-              <div className="bg-green-600 text-white w-14 h-14 rounded-full flex
-              items-center justify-center mb-5 text-2xl font-bold shadow-md">
-                2
-              </div>
-              <h3 className="font-semibold text-lg text-white mb-2">Practice with Voice</h3>
-              <p className="text-gray-400 text-sm text-justify">
-                Answer AI-generated questions using your voice. Experience realistic interview scenarios with instant feedback.
-              </p>
-            </div>
-
-            <div className={`flex flex-col items-center text-center px-4 transition-all duration-700 delay-900 ${
-              hiwVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-20"
-            }`}>
-              <div className="bg-green-600 text-white w-14 h-14 rounded-full flex
-              items-center justify-center mb-5 text-2xl font-bold shadow-md">
-                3
-              </div>
-              <h3 className="font-semibold text-lg text-white mb-2">Track & Improve</h3>
-              <p className="text-gray-400 text-sm text-justify">
-                View detailed scores, get improvement suggestions, and climb the leaderboard to showcase your skills.
-              </p>
-            </div>
+            ))}
           </div>
         </div>
       </main>
 
-     {/* Footer */}
-        <Footer />
-
-
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }
