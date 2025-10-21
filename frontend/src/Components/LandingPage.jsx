@@ -166,14 +166,7 @@ items-center justify-between sticky top-0 z-50">
       >
         Start Practicing Now
       </button>
-      <button
-        onClick={() => navigate("/register")}
-        className="px-6 py-3 sm:px-8 sm:py-3 rounded-md font-semibold bg-gray-700 text-white
-        hover:bg-gray-600 transition-all duration-300 ease-in-out transform
-        hover:scale-105 text-base sm:text-lg w-full sm:w-auto"
-      >
-        Create Account
-      </button>
+      
     </div>
   </div>
 
@@ -280,9 +273,7 @@ items-center justify-between sticky top-0 z-50">
       <h3 className="font-semibold text-lg text-white mb-2">Practice with Voice</h3>
       <p className="text-gray-400 text-sm leading-relaxed">
         Answer AI-generated questions using your voice. Experience realistic interview scenarios with instant feedback.
-        <span className="block mt-2 text-green-400 text-xs font-medium">
-          🎤 Professional microphone or earphones recommended for best audio quality
-        </span>
+        
       </p>
     </div>
 
