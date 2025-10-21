@@ -57,17 +57,21 @@ Prep Mind is an intelligent interview preparation platform that uses AI to provi
 
 
 
-**Dashboard Preview** <img width="1917" height="800" alt="image" src="https://github.com/user-attachments/assets/7db648d8-6467-469c-b8c4-eadc5afa6f6e" />
+**Dashboard Preview** 
+<img width="1917" height="800" alt="image" src="https://github.com/user-attachments/assets/7db648d8-6467-469c-b8c4-eadc5afa6f6e" />
 
-**Interview Interface** <img width="1919" height="1021" alt="image" src="https://github.com/user-attachments/assets/acf17c69-8695-4e64-a814-662175e20157" />
+**Interview Interface** 
+<img width="1919" height="1021" alt="image" src="https://github.com/user-attachments/assets/acf17c69-8695-4e64-a814-662175e20157" />
 <img width="1919" height="968" alt="image" src="https://github.com/user-attachments/assets/84234d7e-64fd-4c9e-a344-c0c96042e9ad" />
 
-**Leaderboard Interface** <img width="1919" height="900" alt="image" src="https://github.com/user-attachments/assets/208925ec-3357-404d-aba9-d7e252e832ab" />
+**Leaderboard Interface**
+<img width="1919" height="900" alt="image" src="https://github.com/user-attachments/assets/208925ec-3357-404d-aba9-d7e252e832ab" />
 
-**Test History Interface** <img width="1919" height="920" alt="image" src="https://github.com/user-attachments/assets/cff5749b-276d-4c58-9739-5f4124ff726b" />
+**Test History Interface**
+<img width="1919" height="920" alt="image" src="https://github.com/user-attachments/assets/cff5749b-276d-4c58-9739-5f4124ff726b" />
 
-
-**UserProfile Interface** <img width="1911" height="820" alt="image" src="https://github.com/user-attachments/assets/81457af0-622a-42ad-ac8f-4816883cc778" />
+**UserProfile Interface**
+<img width="1911" height="820" alt="image" src="https://github.com/user-attachments/assets/81457af0-622a-42ad-ac8f-4816883cc778" />
 
 
 ## 🏃‍♂️ Quick Start
