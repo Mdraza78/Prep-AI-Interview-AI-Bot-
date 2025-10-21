@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Bot, Mic, MicOff, Volume2 } from "lucide-react";
+import { Bot, Mic, MicOff, Volume2, ChevronLeft, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { API_URLS } from "../config/api";
 
-const BORDER_COLOR = "#238636";
+const BORDER_COLOR = "#10b981";
 
 // Animation helper
 const fadeSlideInStyle = (delay) => ({
@@ -17,55 +17,66 @@ const fadeSlideInStyle = (delay) => ({
 });
 
 function QuestionDisplay({ question }) {
-  const codeBlockRegex = /``````/g;
+  const codeBlockRegex = /(```[\s\S]*?```)/g;
   const parts = [];
-  let lastIndex = 0,
-    match,
-    key = 0;
+  let lastIndex = 0;
+  let match;
+  let key = 0;
 
   while ((match = codeBlockRegex.exec(question)) !== null) {
+    // Add text before code block
     if (match.index > lastIndex) {
       const text = question.slice(lastIndex, match.index);
       if (text.trim()) {
         parts.push(
           <div
             key={`text-${key++}`}
-            className="mb-2 text-base text-white whitespace-pre-wrap"
+            className="mb-4 text-gray-100 leading-relaxed text-base sm:text-lg"
           >
             {text.trim()}
           </div>
         );
       }
     }
-    const codeContent = match[1];
+
+    // Add code block
+    const codeContent = match[1].replace(/```/g, '').trim();
     parts.push(
       <div
         key={`code-${key++}`}
-        className="my-4 rounded-xl bg-[#191f26] border-2 border-green-700 shadow-lg max-w-full overflow-auto"
+        className="my-4 rounded-lg bg-gray-800 border border-emerald-500/30 overflow-hidden"
       >
-        <pre className="px-5 py-4 text-sm leading-snug text-green-100 font-mono whitespace-pre">
+        <div className="bg-gray-900 px-4 py-2 border-b border-emerald-500/20">
+          <span className="text-xs text-emerald-400 font-mono">Code</span>
+        </div>
+        <pre className="px-4 py-3 text-sm text-gray-100 font-mono overflow-x-auto">
           <code>{codeContent}</code>
         </pre>
       </div>
     );
     lastIndex = match.index + match[0].length;
   }
+
+  // Add remaining text
   if (lastIndex < question.length) {
     const text = question.slice(lastIndex);
     if (text.trim()) {
       parts.push(
         <div
           key={`text-end`}
-          className="mt-1 text-base text-white whitespace-pre-wrap"
+          className="text-gray-100 leading-relaxed text-base sm:text-lg"
         >
           {text.trim()}
         </div>
       );
     }
   }
+
   if (parts.length === 0) {
     return (
-      <div className="text-base text-white whitespace-pre-wrap">{question}</div>
+      <div className="text-gray-100 leading-relaxed text-base sm:text-lg whitespace-pre-wrap">
+        {question}
+      </div>
     );
   }
   return <>{parts}</>;
@@ -102,7 +113,6 @@ export default function Test() {
 
       recognition.onstart = () => setIsRecording(true);
 
-      // ✅ FIX: Capture ALL speech segments, not just first one
       recognition.onresult = (event) => {
         let transcript = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -307,18 +317,13 @@ export default function Test() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-900 bg-gradient-to-br from-[#0e1a23] via-[#1b2735] to-[#202935]">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Animations */}
       <style>{`
         @keyframes fadeSlideIn {
           0% { opacity: 0; transform: translateY(1rem); }
           100% { opacity: 1; transform: translateY(0); }
         }
-        @keyframes fade-slide {
-          0% { opacity: 0; transform: translateY(20px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-slide { animation: fade-slide 0.6s cubic-bezier(.28,.84,.42,1) forwards; }
         @keyframes pulse-glow {
           0%, 100% { box-shadow: 0 0 12px 3px ${BORDER_COLOR}88; }
           50% { box-shadow: 0 0 20px 5px ${BORDER_COLOR}cc; }
@@ -326,208 +331,233 @@ export default function Test() {
         .animate-progress-pulse { animation: pulse-glow 2.5s infinite ease-in-out; }
       `}</style>
 
-      {/* Header */}
-      <header className="w-full bg-[#181f27] border-b-2 border-gray-500 shadow-lg" style={fadeSlideInStyle("0s")}>
-        <div className="flex items-center justify-between max-w-5xl mx-auto py-7 px-6">
-          <div className="flex items-center" style={fadeSlideInStyle("0.1s")}>
-            <div
-              className="w-14 h-14 bg-green-700 rounded-xl flex items-center justify-center"
-              style={{ minWidth: 56, minHeight: 56 }}
+      {/* Professional Header */}
+      <header className="w-full bg-gray-800/80 backdrop-blur-sm border-b border-gray-700 shadow-lg sticky top-0 z-50">
+        <div className="flex items-center justify-between max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors duration-200"
+              aria-label="Back to Dashboard"
             >
-              <Bot size={32} className="text-white" />
-            </div>
-            <div className="ml-4">
-              <h1 className="text-3xl font-bold text-white leading-tight">
-                Prep Mind
-              </h1>
-              <div className="text-base text-gray-200 opacity-85 -mt-1">
-                Smart Preparation
+              <ChevronLeft size={20} className="text-white" />
+            </button>
+            <div className="flex items-center space-x-3">
+              <div className="bg-emerald-600 rounded-lg p-2">
+                <Bot size={24} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">Prep Mind</h1>
+                <p className="text-xs text-gray-300">Interview Test</p>
               </div>
             </div>
           </div>
-          <div
-            className="text-base font-normal text-white opacity-70"
-            style={fadeSlideInStyle("0.2s")}
-          >
-            Hello, {userName}
+          
+          <div className="flex items-center space-x-3">
+            <div className="hidden sm:flex items-center space-x-2 bg-gray-700/50 rounded-lg px-3 py-2">
+              <User size={16} className="text-emerald-400" />
+              <span className="text-white text-sm font-medium">{userName}</span>
+            </div>
+            <div className="flex items-center space-x-2 bg-emerald-600/20 rounded-lg px-3 py-2 border border-emerald-500/30">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+              <span className="text-emerald-400 text-sm font-medium">
+                Q{currentIndex + 1}/5
+              </span>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Main */}
-      <main className="flex-1 flex items-center justify-center w-full py-8 px-2" style={fadeSlideInStyle("0.3s")}>
-        <div
-          className="w-full max-w-3xl rounded-2xl shadow-xl border border-solid border-green-700 px-10 sm:px-20 py-12 my-12"
-          style={{
-            backgroundColor: "#17212d",
-            boxShadow:
-              "0 8px 32px 0 rgba(22,101,52,0.15), 0 2px 7px 0 #131e2a80",
-            ...fadeSlideInStyle("0.4s"),
-          }}
-        >
+      {/* Main Content */}
+      <main className="flex-1 w-full py-6 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto">
           {isLoadingQuestions ? (
-            <div className="text-center py-32 text-lg text-green-700 font-semibold animate-pulse">
-              Loading your interview…
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-500 mb-4"></div>
+              <p className="text-gray-300 text-lg font-medium">Preparing your interview questions...</p>
+              <p className="text-gray-400 text-sm mt-2">This may take a few moments</p>
             </div>
           ) : score !== null ? (
-            <div className="text-center py-16" style={fadeSlideInStyle("0.5s")}>
-              <h2 className="text-3xl font-semibold mb-4 text-white">
-                Interview Complete!
-              </h2>
-              <div className="text-base font-normal mb-2 text-white">Your Score:</div>
-              <div className="text-3xl font-semibold mb-10 text-white ">
-                {score} / 100
-              </div>
-              <div className="flex justify-center">
+            <div className="text-center py-12" style={fadeSlideInStyle("0.5s")}>
+              <div className="bg-gray-800 rounded-2xl p-8 sm:p-12 border border-emerald-500/30 shadow-2xl">
+                <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-2xl font-bold text-white">✓</span>
+                </div>
+                <h2 className="text-3xl font-bold text-white mb-4">
+                  Interview Complete!
+                </h2>
+                <div className="text-gray-300 mb-2">Your Overall Score</div>
+                <div className="text-5xl font-bold text-emerald-400 mb-8">
+                  {score}<span className="text-2xl text-gray-400">/100</span>
+                </div>
                 <button
                   onClick={() => navigate("/dashboard")}
-                  className="px-8 py-2 rounded-full bg-green-700 text-green-100 font-medium shadow-lg transform hover:scale-105 hover:shadow-2xl active:scale-95 transition-transform duration-300 ease-in-out"
+                  className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
                 >
                   Return to Dashboard
                 </button>
               </div>
             </div>
           ) : questions.length !== 5 ? (
-            <p className="text-center text-gray-100 font-normal text-base">
-              Expected 5 questions, found {questions.length}.
-            </p>
+            <div className="text-center py-20">
+              <p className="text-gray-300 text-lg">
+                Expected 5 questions, found {questions.length}.
+              </p>
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="mt-4 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+              >
+                Go Back
+              </button>
+            </div>
           ) : (
-            <>
-              {/* Progress bar */}
-              <div
-                className="relative w-full h-3 rounded-lg mb-6 overflow-hidden bg-[#1e293a] border border-green-700"
-                style={fadeSlideInStyle("0.5s")}
-              >
-                <div
-                  className="absolute left-0 top-0 h-full rounded transition-all duration-700 animate-progress-pulse"
-                  style={{
-                    width: `${((currentIndex + 1) / questions.length) * 100}%`,
-                    backgroundColor: BORDER_COLOR,
-                    boxShadow: `0 0 15px 4px ${BORDER_COLOR}88`,
-                  }}
-                ></div>
-              </div>
-
-              {/* Question header */}
-              <div
-                className="flex items-center justify-between mb-3"
-                style={fadeSlideInStyle("0.6s")}
-              >
-                <span className="uppercase tracking-wider font-medium text-base text-green-700">
-                  Question {currentIndex + 1} of {questions.length}
-                </span>
-                <button
-                  onClick={handleReplayQuestion}
-                  className="p-1.5 rounded-full shadow transition bg-green-700 hover:bg-green-800 active:scale-90 focus:outline-none"
-                  title="Replay Question"
-                >
-                  <Volume2 size={20} className="text-green-100" />
-                </button>
-              </div>
-
-              {/* Question body */}
-              <div className="mb-6" style={fadeSlideInStyle("0.7s")}>
-                <QuestionDisplay question={questions[currentIndex]} />
-                {isSpeaking && (
-                  <span className="inline-block align-middle ml-3">
-                    <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-1 animate-bounce"></span>
-                    <span className="inline-block w-2 h-2 bg-teal-400 rounded-full animate-bounce [animation-delay:_0.12s]"></span>
-                    <span className="inline-block w-2 h-2 bg-cyan-400 rounded-full animate-bounce [animation-delay:_0.22s]"></span>
+            <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700 shadow-2xl overflow-hidden">
+              {/* Progress Section */}
+              <div className="bg-gray-900 px-6 py-4 border-b border-gray-700">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-emerald-400 font-semibold text-sm uppercase tracking-wider">
+                    Question {currentIndex + 1} of {questions.length}
                   </span>
-                )}
+                  <button
+                    onClick={handleReplayQuestion}
+                    className="flex items-center space-x-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors duration-200"
+                    title="Replay Question"
+                  >
+                    <Volume2 size={16} className="text-white" />
+                    <span className="text-white text-sm hidden sm:block">Replay</span>
+                  </button>
+                </div>
+                
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div
+                    className="bg-emerald-500 h-2 rounded-full transition-all duration-500 ease-out"
+                    style={{
+                      width: `${((currentIndex + 1) / questions.length) * 100}%`,
+                    }}
+                  ></div>
+                </div>
               </div>
 
-              {/* Answer input */}
-              <div className="mb-2" style={fadeSlideInStyle("0.8s")}>
-                {currentIndex < 4 ? (
-                  <>
-                    <div className="flex justify-center mb-2">
-                      <button
-                        onClick={isRecording ? stopRecording : startRecording}
-                        disabled={!recognitionSupported}
-                        className={`flex items-center gap-2 px-7 py-2 rounded-full font-normal shadow text-base transform transition-transform duration-300 ease-in-out hover:scale-105 hover:shadow-lg active:scale-95 ${
-                          isRecording
-                            ? "bg-red-500 text-white"
-                            : "bg-green-700 text-green-100"
-                        } ${
-                          !recognitionSupported
-                            ? "opacity-50 cursor-not-allowed"
-                            : ""
-                        }`}
-                      >
-                        {isRecording ? <MicOff size={17} /> : <Mic size={16} />}
-                        {isRecording ? "Stop Recording" : "Answer Using Voice"}
-                      </button>
+              {/* Question Content */}
+              <div className="p-6 sm:p-8">
+                <div className="mb-6">
+                  <QuestionDisplay question={questions[currentIndex]} />
+                  {isSpeaking && (
+                    <div className="flex items-center mt-4 text-emerald-400">
+                      <div className="flex space-x-1 mr-2">
+                        <div className="w-1 h-4 bg-emerald-400 rounded-full animate-bounce"></div>
+                        <div className="w-1 h-4 bg-emerald-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-1 h-4 bg-emerald-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                      </div>
+                      <span className="text-sm">Reading question...</span>
                     </div>
-                    <br />
-                    <textarea
-                      readOnly
-                      rows={4}
-                      className="block w-full p-3 rounded-lg border border-green-700 bg-[#181f27] text-green-100 font-normal resize-none shadow-inner"
-                      placeholder={
-                        recognitionSupported
-                          ? "Your answer will appear here after speaking."
-                          : "Voice input not supported in your browser"
-                      }
-                      value={answerInput}
-                    />
-                  </>
-                ) : (
-                  <textarea
-                    rows={7}
-                    className="block w-full p-3 rounded-lg border border-green-700 bg-[#181f27] text-green-100 font-normal resize-none shadow-inner"
-                    placeholder="Please type your answer here"
-                    value={answerInput}
-                    onChange={(e) => setAnswerInput(e.target.value)}
-                  />
-                )}
-              </div>
+                  )}
+                </div>
 
-              {/* Buttons */}
-              <div
-                className="flex justify-center mt-7 space-x-6"
-                style={fadeSlideInStyle("0.9s")}
-              >
-                <button
-                  onClick={handleSkip}
-                  className="w-36 py-3 rounded-lg font-semibold bg-green-700 text-white shadow hover:bg-green-800 active:scale-95 transition-transform duration-300 ease-in-out"
-                >
-                  Skip
-                </button>
-                {currentIndex < questions.length - 1 ? (
+                {/* Answer Input Section */}
+                <div className="space-y-4">
+                  {currentIndex < 4 ? (
+                    <>
+                      <div className="flex justify-center">
+                        <button
+                          onClick={isRecording ? stopRecording : startRecording}
+                          disabled={!recognitionSupported}
+                          className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+                            isRecording
+                              ? "bg-red-500 hover:bg-red-600 text-white animate-pulse"
+                              : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          } ${
+                            !recognitionSupported
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
+                          }`}
+                        >
+                          {isRecording ? (
+                            <MicOff size={18} className="text-white" />
+                          ) : (
+                            <Mic size={18} className="text-white" />
+                          )}
+                          <span>
+                            {isRecording ? "Stop Recording" : "Answer with Voice"}
+                          </span>
+                        </button>
+                      </div>
+                      
+                      <textarea
+                        readOnly
+                        rows={4}
+                        className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-500 transition-colors"
+                        placeholder={
+                          recognitionSupported
+                            ? "Your voice answer will appear here..."
+                            : "Voice input not supported in your browser"
+                        }
+                        value={answerInput}
+                      />
+                    </>
+                  ) : (
+                    <textarea
+                      rows={6}
+                      className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-500 transition-colors"
+                      placeholder="Type your code solution here..."
+                      value={answerInput}
+                      onChange={(e) => setAnswerInput(e.target.value)}
+                    />
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4 mt-8">
                   <button
-                    onClick={handleNext}
-                    disabled={answerInput.trim() === ""}
-                    className="w-44 py-3 rounded-lg font-semibold border border-gray-600 text-gray-400 bg-transparent hover:bg-green-700 hover:text-white disabled:opacity-60 disabled:cursor-not-allowed transition ease-in-out duration-300 active:scale-95"
+                    onClick={handleSkip}
+                    className="px-8 py-3 bg-gray-600 hover:bg-gray-500 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95"
                   >
-                    Next
+                    Skip Question
                   </button>
-                ) : (
-                  <button
-                    onClick={handleEndTest}
-                    disabled={answerInput.trim() === "" || isSubmitting}
-                    className="w-44 py-3 rounded-lg font-semibold border border-gray-600 text-gray-400 bg-transparent hover:bg-green-700 hover:text-white disabled:opacity-60 disabled:cursor-not-allowed transition ease-in-out duration-300 active:scale-95"
-                  >
-                    {isSubmitting ? "Submitting..." : "Finish Test"}
-                  </button>
-                )}
+                  
+                  {currentIndex < questions.length - 1 ? (
+                    <button
+                      onClick={handleNext}
+                      disabled={!answerInput.trim()}
+                      className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    >
+                      Next Question
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleEndTest}
+                      disabled={!answerInput.trim() || isSubmitting}
+                      className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    >
+                      {isSubmitting ? (
+                        <span className="flex items-center space-x-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Submitting...</span>
+                        </span>
+                      ) : (
+                        "Finish Interview"
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
-            </>
+            </div>
           )}
         </div>
       </main>
 
-      {/* Footer */}
-      <footer
-        className="w-full bg-[#181f27] border-t- border-gray-500 py-4 mt-4"
-        style={fadeSlideInStyle("1s")}
-      >
-        <div className="text-center text-green-700 font-medium tracking-wide text-base">
-          © 2025 Prep Mind.
-          <span className="text-gray-400"> All rights reserved. </span>
-          <span className="text-xs text-gray-500 block mt-1">
-            Made with ❤️ by Md Raza.
-          </span>
+      {/* Professional Footer */}
+      <footer className="bg-gray-800/80 backdrop-blur-sm border-t border-gray-700 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center text-gray-400">
+            <p className="text-sm">
+              © 2025 Prep Mind. All rights reserved.
+            </p>
+            <p className="text-xs mt-1">
+              Made with ❤️ by Md Raza
+            </p>
+          </div>
         </div>
       </footer>
     </div>
