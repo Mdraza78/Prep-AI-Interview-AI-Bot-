@@ -140,11 +140,12 @@ items-center justify-between sticky top-0 z-50">
       {/* Main Content */}
       <main className="flex flex-col items-center px-4 sm:px-6 py-8 sm:py-12 gap-12 sm:gap-16 flex-1">
 
-{/* Hero Section */}
-<div className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16 w-full max-w-6xl mt-12 sm:mt-16">
+        
+       {/* Hero Section */}
+<div className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16 w-full max-w-6xl mt-8 sm:mt-0">
   {/* Text Content */}
   <div
-    className="flex flex-col text-center lg:text-left w-full lg:w-1/2 pt-6 sm:pt-0"
+    className="flex flex-col text-center lg:text-left w-full lg:w-1/2 pt-4 sm:pt-0"
     style={fadeSlideInStyle("0.25s")}
   >
     <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight text-white mb-4 sm:mb-6">
@@ -152,9 +153,9 @@ items-center justify-between sticky top-0 z-50">
       <span className="text-green-500">Prep-Mind</span>
     </h1>
     <p className="text-gray-400 text-base sm:text-lg leading-relaxed mb-6 sm:mb-8 max-w-2xl mx-auto lg:mx-0">
-      Transform your interview preparation with our AI-powered platform. Upload your resume to receive personalized question sets tailored to your experience. 
-      Practice with realistic voice-based simulations, receive instant AI feedback on your responses, and track your progress with detailed analytics. 
-      Join thousands of professionals who have boosted their confidence and success rates with Prep-Mind's comprehensive interview coaching system.
+      Upload your resume, practice with AI-generated questions, and track your
+      progress. Prep Mind helps you ace your interviews with personalized feedback
+      and realistic practice sessions.
     </p>
     <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start">
       <button
@@ -164,6 +165,14 @@ items-center justify-between sticky top-0 z-50">
         hover:scale-105 text-base sm:text-lg w-full sm:w-auto"
       >
         Start Practicing Now
+      </button>
+      <button
+        onClick={() => navigate("/register")}
+        className="px-6 py-3 sm:px-8 sm:py-3 rounded-md font-semibold bg-gray-700 text-white
+        hover:bg-gray-600 transition-all duration-300 ease-in-out transform
+        hover:scale-105 text-base sm:text-lg w-full sm:w-auto"
+      >
+        Create Account
       </button>
     </div>
   </div>
