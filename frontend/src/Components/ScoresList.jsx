@@ -8,7 +8,9 @@ import {
   Eye,
   ArrowLeft,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  BarChart3,
+  FileText
 } from "lucide-react";
 import { API_URLS } from "../config/api";
 
@@ -32,7 +34,7 @@ export default function ScoresList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeDetailAttempt, setActiveDetailAttempt] = useState(null);
 
-  const attemptsPerPage = 5; // show only 5 attempts per page
+  const attemptsPerPage = 5;
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
@@ -55,26 +57,46 @@ export default function ScoresList() {
     if (token) fetchScores();
   }, [token]);
 
+  // Animation helper
+  const fadeSlideInStyle = (delay) => ({
+    animationName: "fadeSlideIn",
+    animationDuration: "0.7s",
+    animationTimingFunction: "ease-out",
+    animationFillMode: "forwards",
+    animationDelay: delay,
+    opacity: 0,
+    transform: "translateY(1rem)",
+  });
+
   if (loading) {
     return (
-      <div className="text-center py-24 text-green-400 font-semibold text-xl">
-        Loading your test history...
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-500 mb-4"></div>
+        <p className="text-gray-300 text-lg font-medium">Loading your test history...</p>
+        <p className="text-gray-400 text-sm mt-2">Please wait</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-24 text-red-500 font-semibold text-xl">
-        Error: {error}
+      <div className="text-center py-20">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 max-w-md mx-auto">
+          <div className="text-red-400 text-lg font-semibold mb-2">Error Loading Results</div>
+          <div className="text-gray-300">{error}</div>
+        </div>
       </div>
     );
   }
 
   if (!results.length) {
     return (
-      <div className="text-center py-24 text-gray-300 text-lg">
-        No test history found.
+      <div className="text-center py-20">
+        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-8 max-w-md mx-auto">
+          <FileText className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+          <div className="text-gray-300 text-lg font-medium mb-2">No Test History Found</div>
+          <div className="text-gray-400 text-sm">Complete your first interview to see results here</div>
+        </div>
       </div>
     );
   }
@@ -108,17 +130,6 @@ export default function ScoresList() {
       ? Math.max(...attemptsSorted.map((att) => att.totalScore || 0))
       : 0;
 
-  // Animation helper
-  const fadeSlideInStyle = (delay) => ({
-    animationName: "fadeSlideIn",
-    animationDuration: "0.7s",
-    animationTimingFunction: "ease-out",
-    animationFillMode: "forwards",
-    animationDelay: delay,
-    opacity: 0,
-    transform: "translateY(1rem)",
-  });
-
   return (
     <>
       <style>{`
@@ -128,174 +139,257 @@ export default function ScoresList() {
         }
       `}</style>
 
-      <div className="max-w-[820px] mx-auto pt-4 pb-6 px-4">
+      <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {!activeDetailAttempt ? (
           <>
+            {/* Header */}
+            <div className="mb-8 text-center" style={fadeSlideInStyle("0.1s")}>
+              <div className="flex items-center justify-center gap-3 mb-3">
+                <BarChart3 className="w-8 h-8 text-emerald-400" />
+                <h1 className="text-3xl font-bold text-white">Test Results</h1>
+              </div>
+              <p className="text-gray-400">Track your interview performance and progress</p>
+            </div>
+
             {/* Summary Cards */}
-            <div className="flex flex-col sm:flex-row gap-5 mb-9">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
               {/* Total Tests */}
               <div
-                style={fadeSlideInStyle("0.1s")}
-                className="flex items-center gap-4 rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg py-7 px-6 w-[250px] hover:scale-105 transition-transform"
+                style={fadeSlideInStyle("0.2s")}
+                className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:scale-105"
               >
-                <div className="bg-green-400/10 rounded-lg p-3 flex items-center justify-center">
-                  <TrendingUp className="w-8 h-8 text-green-400" />
-                </div>
-                <div>
-                  <div className="text-white font-bold text-2xl">{totalTests}</div>
-                  <div className="text-gray-300 text-base">Total Tests</div>
+                <div className="flex items-center gap-4">
+                  <div className="bg-emerald-500/10 rounded-lg p-3">
+                    <TrendingUp className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-white">{totalTests}</div>
+                    <div className="text-gray-400 text-sm">Total Tests</div>
+                  </div>
                 </div>
               </div>
+
               {/* Average Score */}
               <div
                 style={fadeSlideInStyle("0.3s")}
-                className="flex items-center gap-4 rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg py-7 px-6 w-[250px] hover:scale-105 transition-transform"
+                className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:scale-105"
               >
-                <div className="bg-green-400/10 rounded-lg p-3 flex items-center justify-center">
-                  <Target className="w-8 h-8 text-green-400" />
-                </div>
-                <div>
-                  <div className="text-white font-bold text-2xl">{averageScore}</div>
-                  <div className="text-gray-300 text-base">Average Score</div>
+                <div className="flex items-center gap-4">
+                  <div className="bg-emerald-500/10 rounded-lg p-3">
+                    <Target className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-white">{averageScore}</div>
+                    <div className="text-gray-400 text-sm">Average Score</div>
+                  </div>
                 </div>
               </div>
+
               {/* Best Score */}
               <div
-                style={fadeSlideInStyle("0.5s")}
-                className="flex items-center gap-4 rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg py-7 px-6 w-[250px] hover:scale-105 transition-transform"
+                style={fadeSlideInStyle("0.4s")}
+                className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:scale-105"
               >
-                <div className="bg-green-400/10 rounded-lg p-3 flex items-center justify-center">
-                  <Award className="w-8 h-8 text-green-400" />
-                </div>
-                <div>
-                  <div className="text-white font-bold text-2xl">{bestScore}</div>
-                  <div className="text-gray-300 text-base">Best Score</div>
+                <div className="flex items-center gap-4">
+                  <div className="bg-emerald-500/10 rounded-lg p-3">
+                    <Award className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-white">{bestScore}</div>
+                    <div className="text-gray-400 text-sm">Best Score</div>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Attempts List */}
-            <h5 className="text-white text-3xl mb-7">Recent Test Results</h5>
-            <div className="flex flex-col gap-7">
-              {currentAttempts.map((attempt, idx) => {
-                const [datePart, timePart] = formatDateTime(attempt.createdAt).split(", ");
-                const percentage = Math.round(attempt.totalScore);
-                return (
-                  <div
-                    key={attempt._id || idx}
-                    style={fadeSlideInStyle(`${0.1 * (idx + 1)}s`)}
-                    className="rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg p-6"
-                  >
-                    <div className="flex justify-between gap-4">
-                      <div>
-                        <div className="text-white font-semibold text-lg">
-                          Attempt #{totalTests - (startIndex + idx)}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-2 flex gap-6">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" /> {datePart}
+            <div className="bg-gray-800/30 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
+              <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                Recent Test Results
+              </h2>
+              
+              <div className="space-y-4">
+                {currentAttempts.map((attempt, idx) => {
+                  const [datePart, timePart] = formatDateTime(attempt.createdAt).split(", ");
+                  const percentage = Math.round(attempt.totalScore);
+                  const attemptNumber = totalTests - (startIndex + idx);
+                  
+                  return (
+                    <div
+                      key={attempt._id || idx}
+                      style={fadeSlideInStyle(`${0.1 * (idx + 1)}s`)}
+                      className="bg-gray-800/50 border border-gray-700 rounded-lg p-5 hover:border-emerald-500/30 transition-all duration-300"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="bg-emerald-500/10 rounded-lg px-3 py-1">
+                              <span className="text-emerald-400 font-semibold text-sm">
+                                Attempt #{attemptNumber}
+                              </span>
+                            </div>
+                            <div className="text-2xl font-bold text-emerald-400">
+                              {percentage}%
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" /> {timePart}
+                          
+                          <div className="flex flex-wrap gap-4 text-sm text-gray-400 mb-3">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              <span>{datePart}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              <span>{timePart}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-sm">
+                            <Target className="w-4 h-4 text-emerald-400" />
+                            <span className="text-gray-300">
+                              {attempt.totalScore} out of 100 points
+                            </span>
                           </div>
                         </div>
-                        <div className="text-green-400 mt-4 flex items-center gap-2">
-                          <Target className="w-5 h-5" />
-                          <span className="text-white">
-                            {attempt.totalScore}/100 marks
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-3xl font-bold text-green-400">
-                        {percentage}%
+                        
+                        <button
+                          onClick={() => setActiveDetailAttempt(attempt)}
+                          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 font-medium"
+                        >
+                          <Eye className="w-4 h-4" />
+                          <span>View Details</span>
+                        </button>
                       </div>
                     </div>
-                    <div className="mt-6 border-t border-gray-600 pt-3">
-                      <button
-                        onClick={() => setActiveDetailAttempt(attempt)}
-                        className="w-full text-center font-medium hover:text-green-300 text-gray-200 flex justify-center items-center gap-2"
-                      >
-                        <Eye className="w-5 h-5" /> View Details
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Pagination - lucide-react version */}
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center gap-6 mt-6">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                  disabled={currentPage === 1}
-                  className={`p-2 rounded-full ${
-                    currentPage === 1
-                      ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                      : "bg-green-600 text-white hover:bg-green-700"
-                  }`}
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <span className="text-white">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className={`p-2 rounded-full ${
-                    currentPage === totalPages
-                      ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                      : "bg-green-600 text-white hover:bg-green-700"
-                  }`}
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
+                  );
+                })}
               </div>
-            )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-gray-700">
+                  <div className="text-gray-400 text-sm">
+                    Showing {startIndex + 1}-{Math.min(startIndex + attemptsPerPage, attemptsSorted.length)} of {attemptsSorted.length} attempts
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                      disabled={currentPage === 1}
+                      className={`p-2 rounded-lg transition-colors duration-200 ${
+                        currentPage === 1
+                          ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                          : "bg-emerald-600 text-white hover:bg-emerald-700"
+                      }`}
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                            currentPage === page
+                              ? "bg-emerald-600 text-white"
+                              : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className={`p-2 rounded-lg transition-colors duration-200 ${
+                        currentPage === totalPages
+                          ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                          : "bg-emerald-600 text-white hover:bg-emerald-700"
+                      }`}
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         ) : (
           // Detail View
-          <div
-            style={fadeSlideInStyle("0.1s")}
-            className="rounded-xl border border-gray-700 bg-[#222B3A] shadow-lg p-8 mx-auto max-w-2xl"
-          >
-            <button
-              onClick={() => setActiveDetailAttempt(null)}
-              className="mb-6 px-4 py-2 bg-gray-700 text-white rounded hover:bg-green-600 flex items-center gap-2"
+          <div className="max-w-4xl mx-auto">
+            <div
+              style={fadeSlideInStyle("0.1s")}
+              className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6"
             >
-              <ArrowLeft className="w-5 h-5" /> Back
-            </button>
-            <h3 className="text-2xl font-semibold mb-8 text-center">Attempt Details</h3>
-
-            <div className="flex flex-col gap-6">
-              {activeDetailAttempt.questions?.map((q, qidx) => (
-                <div
-                  key={qidx}
-                  style={fadeSlideInStyle(`${0.1 * (qidx + 1)}s`)}
-                  className="rounded-xl border border-gray-700 bg-[#1B232F] shadow"
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <button
+                  onClick={() => setActiveDetailAttempt(null)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200"
                 >
-                  <div className="flex justify-between items-center px-5 py-2 bg-[#222B3A] border-b border-gray-700">
-                    <span className="text-green-300 font-semibold">
-                      Question {qidx + 1}
-                    </span>
-                    <span className="text-green-400 font-semibold text-sm">
-                      {q.individualScore} / 20
-                    </span>
-                  </div>
-                  <div className="px-5 py-4">
-                    <div className="font-semibold">{q.question}</div>
-                    <div className="mt-2 text-gray-300">
-                      <span className="font-semibold">Your answer:</span> {q.answer}
-                    </div>
-                    {q.feedback && (
-                      <div className="mt-2 italic">
-                        <span className="font-semibold">Feedback:</span> {q.feedback}
-                      </div>
-                    )}
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Results</span>
+                </button>
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold text-white">Attempt Details</h3>
+                  <div className="text-emerald-400 text-lg font-semibold mt-1">
+                    Score: {activeDetailAttempt.totalScore}/100
                   </div>
                 </div>
-              ))}
+                <div className="w-20"></div> {/* Spacer for alignment */}
+              </div>
+
+              {/* Questions List */}
+              <div className="space-y-4">
+                {activeDetailAttempt.questions?.map((q, qidx) => (
+                  <div
+                    key={qidx}
+                    style={fadeSlideInStyle(`${0.1 * (qidx + 1)}s`)}
+                    className="bg-gray-800/30 border border-gray-700 rounded-lg overflow-hidden"
+                  >
+                    {/* Question Header */}
+                    <div className="flex justify-between items-center px-4 py-3 bg-gray-700/50 border-b border-gray-600">
+                      <span className="text-emerald-300 font-semibold flex items-center gap-2">
+                        <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                        Question {qidx + 1}
+                      </span>
+                      <span className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-sm font-semibold">
+                        {q.individualScore} / 20
+                      </span>
+                    </div>
+                    
+                    {/* Question Content */}
+                    <div className="p-4 space-y-4">
+                      <div>
+                        <div className="text-gray-400 text-sm font-medium mb-2">Question:</div>
+                        <div className="text-white bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                          {q.question}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <div className="text-gray-400 text-sm font-medium mb-2">Your Answer:</div>
+                        <div className="text-gray-300 bg-gray-800/30 rounded-lg p-3 border border-gray-700">
+                          {q.answer || "No answer provided"}
+                        </div>
+                      </div>
+                      
+                      {q.feedback && (
+                        <div>
+                          <div className="text-gray-400 text-sm font-medium mb-2">Feedback:</div>
+                          <div className="text-amber-300 bg-amber-500/10 rounded-lg p-3 border border-amber-500/20 italic">
+                            {q.feedback}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
