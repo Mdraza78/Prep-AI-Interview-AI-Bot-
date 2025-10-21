@@ -111,9 +111,9 @@ Prep Mind is an intelligent interview preparation platform that uses AI to provi
    ```
 
 5. **Run the application**
-    # Start backend server (from backend directory)
-       npm start
+    Start backend server (from backend directory)
+        npm start
 
-    # Start frontend development server (from frontend directory)  
+    Start frontend development server (from frontend directory)  
         npm run dev
    
