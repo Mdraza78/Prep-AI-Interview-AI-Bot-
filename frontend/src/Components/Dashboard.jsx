@@ -187,23 +187,27 @@ export default function Dashboard() {
       {/* Main content */}
       <div className="flex flex-col flex-grow h-screen overflow-hidden w-full">
         {/* Navbar */}
-        <div
-          className="flex items-center justify-between px-4 sm:px-6 lg:px-10 bg-gray-900"
-          style={{ height: 70, minHeight: 70, ...fadeSlideInStyle("0.15s") }}
-        >
-          <button
-            className="p-2 rounded hover:bg-gray-800 lg:hidden"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Toggle sidebar"
-          >
-            <Menu size={24} className="text-white" />
-          </button>
-          <span className="text-white font-semibold text-base lg:ml-auto text-center flex-1 lg:flex-none">
-            Hello, {userName}
-          </span>
-          {/* Spacer for mobile to center the text */}
-          <div className="w-10 lg:hidden" />
-        </div>
+<div
+  className="flex items-center justify-between px-4 sm:px-6 lg:px-10 bg-gray-900"
+  style={{ height: 70, minHeight: 70, ...fadeSlideInStyle("0.15s") }}
+>
+  {/* Hamburger Menu (Left) */}
+  <button
+    className="p-2 rounded hover:bg-gray-800 lg:hidden"
+    onClick={() => setSidebarOpen(true)}
+    aria-label="Toggle sidebar"
+  >
+    <Menu size={24} className="text-white" />
+  </button>
+
+  {/* Empty space in middle */}
+  <div className="flex-1"></div>
+
+  {/* Hello, UserName (Right Corner) */}
+  <span className="text-white font-semibold text-base whitespace-nowrap">
+    Hello, {userName}
+  </span>
+</div>
         <hr className="border-gray-700" />
 
         {/* Page Content */}
