@@ -12,15 +12,13 @@ const router = express.Router();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Your existing helper function for Gemini question generation...
-async function generateInterviewQuestion(resumeText) {
+async function generateInterviewQuestion(prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-  const prompt = `Given this resume text, ask one strong, relevant interview question that tests the candidate's skills and experience. Only return one question, do not include explanations:\n\n${resumeText}`;
 
   const body = {
     contents: [
       {
-        parts: [{ text: prompt }]
+        parts: [{ text: prompt }] // Send the prompt exactly as defined in the route
       }
     ]
   };
@@ -36,7 +34,9 @@ async function generateInterviewQuestion(resumeText) {
     console.error("Gemini error details:", data);
     throw new Error(data.error?.message || 'Gemini API error');
   }
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "Could not generate question.";
+  
+  // Clean up the text response from the AI
+  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Could not generate question.";
 }
 
 // Middleware for JWT authentication
@@ -365,33 +365,22 @@ router.patch('/profile', authenticateToken, async (req, res) => {
 });
 
 
-// Start interview questions route (your existing code)
 router.post('/start-interview', async (req, res) => {
   try {
-    const { resumeText } = req.body;
-    if (!resumeText) {
-      return res.status(400).json({ error: "Resume text is required" });
-    }
+    const { resumeText } = req.body; // THIS IS YOUR EXTRACTED PDF TEXT
+    if (!resumeText) return res.status(400).json({ error: "Resume text is required" });
 
-    async function getGeminiQuestion(type) {
-      let prompt;
-      if (type === "easy") {
-        prompt = `Given this resume: ${resumeText}\nAsk ONE easy technical question (not coding) relevant to this candidate. Only return the question, do NOT add explanations.`;
-      } else if (type === "output") {
-        prompt = `Given this resume: ${resumeText}\nAsk ONE medium JavaScript interview question: provide a code snippet and ask the candidate "What is the output of the code and why?" Only return the question and code block, no explanations.`;
-      } else if (type === "easycode") {
-        prompt = `Given this resume: ${resumeText}\nAsk ONE simple coding interview question that requires the user to describe the logic in words (not write real code). Only give the question, no explanation.`;
-      }
-      return await generateInterviewQuestion(prompt);
-    }
-
-    const questions = [
-      await getGeminiQuestion("easy"),
-      await getGeminiQuestion("easy"),
-      await getGeminiQuestion("output"),
-      await getGeminiQuestion("output"),
-      await getGeminiQuestion("easycode"),
+    // Every single prompt below now includes the extracted resume text context
+    const prompts = [
+      `Context (Resume): ${resumeText}\nTask: Based on this specific resume, ask one easy technical question. ONLY return the question text.`,
+      `Context (Resume): ${resumeText}\nTask: Based on this specific resume, ask a different technical question. ONLY return the question text.`,
+      `Context (Resume): ${resumeText}\nTask: Use the skills in this resume to provide a JS code snippet and ask "What is the output?". ONLY return code and question.`,
+      `Context (Resume): ${resumeText}\nTask: Use the skills in this resume to provide a DIFFERENT JS code snippet for output. ONLY return code and question.`,
+      `Context (Resume): ${resumeText}\nTask: Based on the candidate's projects/skills, ask one logic/coding question for them to explain. ONLY return the question.`
     ];
+
+    // Parallel execution for speed on Render
+    const questions = await Promise.all(prompts.map(p => generateInterviewQuestion(p)));
 
     res.json({ questions });
   } catch (err) {
