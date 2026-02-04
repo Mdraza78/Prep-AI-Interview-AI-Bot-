@@ -11,32 +11,32 @@ const pdfParse = require('pdf-parse');
 const router = express.Router();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// Your existing helper function for Gemini question generation...
-async function generateInterviewQuestion(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-  const body = {
-    contents: [
-      {
-        parts: [{ text: prompt }] // Send the prompt exactly as defined in the route
-      }
-    ]
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    console.error("Gemini error details:", data);
-    throw new Error(data.error?.message || 'Gemini API error');
-  }
+async function generateInterviewQuestion(prompt, retries = 3) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
   
-  // Clean up the text response from the AI
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Could not generate question.";
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+
+      const data = await response.json();
+      
+      if (response.status === 429 || response.status === 500) {
+        // Wait 2 seconds and try again if it's a rate limit or server error
+        console.log(`Retrying... Attempt ${i + 1}`);
+        await new Promise(res => setTimeout(res, 2000));
+        continue;
+      }
+
+      if (!response.ok) throw new Error(data.error?.message || "AI Error");
+      return data.candidates[0].content.parts[0].text.trim();
+    } catch (err) {
+      if (i === retries - 1) throw err; // Final attempt failed
+    }
+  }
 }
 
 // Middleware for JWT authentication
