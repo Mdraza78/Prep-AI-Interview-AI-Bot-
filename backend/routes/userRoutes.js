@@ -11,34 +11,32 @@ const pdfParse = require('pdf-parse');
 const router = express.Router();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-async function generateInterviewQuestion(prompt, retries = 3) {
-  // Use the local variable or the process.env one
-  const apiKey = process.env.GEMINI_API_KEY; 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-  
-  for (let i = 0; i < retries; i++) {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      });
+// Your existing helper function for Gemini question generation...
+async function generateInterviewQuestion(resumeText) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-      const data = await response.json();
-      
-      // If we hit a rate limit (429) or server error (500), wait and retry
-      if (response.status === 429 || response.status === 500) {
-        console.warn(`Gemini Busy (Status ${response.status}). Retrying attempt ${i + 1}...`);
-        await sleep(2000); // Wait 2 seconds on error
-        continue;
+  const prompt = `Given this resume text, ask one strong, relevant interview question that tests the candidate's skills and experience. Only return one question, do not include explanations:\n\n${resumeText}`;
+
+  const body = {
+    contents: [
+      {
+        parts: [{ text: prompt }]
       }
+    ]
+  };
 
-      if (!response.ok) throw new Error(data.error?.message || "AI Error");
-      return data.candidates[0].content.parts[0].text.trim();
-    } catch (err) {
-      if (i === retries - 1) throw err; 
-    }
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    console.error("Gemini error details:", data);
+    throw new Error(data.error?.message || 'Gemini API error');
   }
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "Could not generate question.";
 }
 
 // Middleware for JWT authentication
@@ -367,42 +365,39 @@ router.patch('/profile', authenticateToken, async (req, res) => {
 });
 
 
-// Add this small helper at the top of your userRoutes.js
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
+// Start interview questions route (your existing code)
 router.post('/start-interview', async (req, res) => {
   try {
     const { resumeText } = req.body;
-    if (!resumeText) return res.status(400).json({ error: "Resume text is required" });
-
-    const promptTasks = [
-      "Based on this resume, ask one easy technical question. ONLY return the question text.",
-      "Based on this resume, ask a different technical question. ONLY return the question text.",
-      "Provide a JS code snippet based on the resume and ask 'What is the output?'. ONLY return code and question.",
-      "Provide a DIFFERENT JS code snippet for output. ONLY return code and question.",
-      "Based on the projects/skills, ask one logic/coding question for explanation. ONLY return the question."
-    ];
-
-    const questions = [];
-
-    // FIX: Sequential execution with a 1-second gap to prevent 429/500 errors
-    for (const task of promptTasks) {
-      const fullPrompt = `Context (Resume): ${resumeText}\nTask: ${task}`;
-      const question = await generateInterviewQuestion(fullPrompt);
-      questions.push(question);
-      
-      // Wait 1 second before the next request
-      await sleep(1000); 
+    if (!resumeText) {
+      return res.status(400).json({ error: "Resume text is required" });
     }
+
+    async function getGeminiQuestion(type) {
+      let prompt;
+      if (type === "easy") {
+        prompt = `Given this resume: ${resumeText}\nAsk ONE easy technical question (not coding) relevant to this candidate. Only return the question, do NOT add explanations.`;
+      } else if (type === "output") {
+        prompt = `Given this resume: ${resumeText}\nAsk ONE medium JavaScript interview question: provide a code snippet and ask the candidate "What is the output of the code and why?" Only return the question and code block, no explanations.`;
+      } else if (type === "easycode") {
+        prompt = `Given this resume: ${resumeText}\nAsk ONE simple coding interview question that requires the user to describe the logic in words (not write real code). Only give the question, no explanation.`;
+      }
+      return await generateInterviewQuestion(prompt);
+    }
+
+    const questions = [
+      await getGeminiQuestion("easy"),
+      await getGeminiQuestion("easy"),
+      await getGeminiQuestion("output"),
+      await getGeminiQuestion("output"),
+      await getGeminiQuestion("easycode"),
+    ];
 
     res.json({ questions });
   } catch (err) {
     console.error('Failed to generate interview questions:', err);
-    // If it still fails, the error likely comes from the AI model itself
-    res.status(500).json({ error: 'AI is currently busy. Please try again in a moment.' });
+    res.status(500).json({ error: 'Failed to generate interview questions' });
   }
 });
-
-
 
 module.exports = router;
