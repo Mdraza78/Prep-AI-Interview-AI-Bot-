@@ -12,7 +12,9 @@ const router = express.Router();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 async function generateInterviewQuestion(prompt, retries = 3) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+  // Use the local variable or the process.env one
+  const apiKey = process.env.GEMINI_API_KEY; 
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
   
   for (let i = 0; i < retries; i++) {
     try {
@@ -24,17 +26,17 @@ async function generateInterviewQuestion(prompt, retries = 3) {
 
       const data = await response.json();
       
+      // If we hit a rate limit (429) or server error (500), wait and retry
       if (response.status === 429 || response.status === 500) {
-        // Wait 2 seconds and try again if it's a rate limit or server error
-        console.log(`Retrying... Attempt ${i + 1}`);
-        await new Promise(res => setTimeout(res, 2000));
+        console.warn(`Gemini Busy (Status ${response.status}). Retrying attempt ${i + 1}...`);
+        await sleep(2000); // Wait 2 seconds on error
         continue;
       }
 
       if (!response.ok) throw new Error(data.error?.message || "AI Error");
       return data.candidates[0].content.parts[0].text.trim();
     } catch (err) {
-      if (i === retries - 1) throw err; // Final attempt failed
+      if (i === retries - 1) throw err; 
     }
   }
 }
@@ -365,28 +367,42 @@ router.patch('/profile', authenticateToken, async (req, res) => {
 });
 
 
+// Add this small helper at the top of your userRoutes.js
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 router.post('/start-interview', async (req, res) => {
   try {
-    const { resumeText } = req.body; // THIS IS YOUR EXTRACTED PDF TEXT
+    const { resumeText } = req.body;
     if (!resumeText) return res.status(400).json({ error: "Resume text is required" });
 
-    // Every single prompt below now includes the extracted resume text context
-    const prompts = [
-      `Context (Resume): ${resumeText}\nTask: Based on this specific resume, ask one easy technical question. ONLY return the question text.`,
-      `Context (Resume): ${resumeText}\nTask: Based on this specific resume, ask a different technical question. ONLY return the question text.`,
-      `Context (Resume): ${resumeText}\nTask: Use the skills in this resume to provide a JS code snippet and ask "What is the output?". ONLY return code and question.`,
-      `Context (Resume): ${resumeText}\nTask: Use the skills in this resume to provide a DIFFERENT JS code snippet for output. ONLY return code and question.`,
-      `Context (Resume): ${resumeText}\nTask: Based on the candidate's projects/skills, ask one logic/coding question for them to explain. ONLY return the question.`
+    const promptTasks = [
+      "Based on this resume, ask one easy technical question. ONLY return the question text.",
+      "Based on this resume, ask a different technical question. ONLY return the question text.",
+      "Provide a JS code snippet based on the resume and ask 'What is the output?'. ONLY return code and question.",
+      "Provide a DIFFERENT JS code snippet for output. ONLY return code and question.",
+      "Based on the projects/skills, ask one logic/coding question for explanation. ONLY return the question."
     ];
 
-    // Parallel execution for speed on Render
-    const questions = await Promise.all(prompts.map(p => generateInterviewQuestion(p)));
+    const questions = [];
+
+    // FIX: Sequential execution with a 1-second gap to prevent 429/500 errors
+    for (const task of promptTasks) {
+      const fullPrompt = `Context (Resume): ${resumeText}\nTask: ${task}`;
+      const question = await generateInterviewQuestion(fullPrompt);
+      questions.push(question);
+      
+      // Wait 1 second before the next request
+      await sleep(1000); 
+    }
 
     res.json({ questions });
   } catch (err) {
     console.error('Failed to generate interview questions:', err);
-    res.status(500).json({ error: 'Failed to generate interview questions' });
+    // If it still fails, the error likely comes from the AI model itself
+    res.status(500).json({ error: 'AI is currently busy. Please try again in a moment.' });
   }
 });
+
+
 
 module.exports = router;
