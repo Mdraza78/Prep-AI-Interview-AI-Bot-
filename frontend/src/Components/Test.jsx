@@ -514,56 +514,80 @@ const handleEndTest = async () => {
                 </div>
 
                 {/* Answer Input Section */}
-                <div className="space-y-4">
-                  {currentIndex < 4 ? (
-                    <>
-                      <div className="flex justify-center">
-                        <button
-                          onClick={isRecording ? stopRecording : startRecording}
-                          disabled={!recognitionSupported}
-                          className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 ${
-                            isRecording
-                              ? "bg-red-500 hover:bg-red-600 text-white animate-pulse"
-                              : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                          } ${
-                            !recognitionSupported
-                              ? "opacity-50 cursor-not-allowed"
-                              : ""
-                          }`}
-                        >
-                          {isRecording ? (
-                            <MicOff size={18} className="text-white" />
-                          ) : (
-                            <Mic size={18} className="text-white" />
-                          )}
-                          <span>
-                            {isRecording ? "Stop Recording" : "Answer with Voice"}
-                          </span>
-                        </button>
-                      </div>
-                      
-                      <textarea
-                        readOnly
-                        rows={4}
-                        className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-500 transition-colors"
-                        placeholder={
-                          recognitionSupported
-                            ? "Your voice answer will appear here..."
-                            : "Voice input not supported in your browser"
-                        }
-                        value={answerInput}
-                      />
-                    </>
-                  ) : (
-                    <textarea
-                      rows={6}
-                      className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-500 transition-colors"
-                      placeholder="Type your code solution here..."
-                      value={answerInput}
-                      onChange={(e) => setAnswerInput(e.target.value)}
-                    />
-                  )}
-                </div>
+// In Test.jsx, update the answer input section
+<div className="space-y-4">
+  {currentIndex < 4 ? (
+    <>
+      <div className="flex justify-center">
+        <button
+          onClick={isRecording ? stopRecording : startRecording}
+          disabled={!recognitionSupported}
+          className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+            isRecording
+              ? "bg-red-500 hover:bg-red-600 text-white animate-pulse"
+              : "bg-emerald-600 hover:bg-emerald-700 text-white"
+          } ${
+            !recognitionSupported
+              ? "opacity-50 cursor-not-allowed"
+              : ""
+          }`}
+        >
+          {isRecording ? (
+            <MicOff size={18} className="text-white" />
+          ) : (
+            <Mic size={18} className="text-white" />
+          )}
+          <span>
+            {isRecording ? "Stop Recording" : "Answer with Voice"}
+          </span>
+        </button>
+      </div>
+      
+      <textarea
+        readOnly
+        rows={4}
+        className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-500 transition-colors"
+        placeholder={
+          recognitionSupported
+            ? "Your voice answer will appear here..."
+            : "Voice input not supported in your browser"
+        }
+        value={answerInput}
+      />
+    </>
+  ) : (
+    <>
+      <div className="bg-gray-900 border border-emerald-500/30 rounded-lg p-4 mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+          <span className="text-emerald-400 font-medium">Coding Question</span>
+          <span className="text-gray-400 text-sm ml-auto">(Type your solution)</span>
+        </div>
+        <p className="text-gray-300 text-sm">This question requires a typed coding solution. Please write your answer below.</p>
+      </div>
+      
+      <textarea
+        rows={8}
+        className="w-full p-4 rounded-lg border border-gray-600 bg-gray-900 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-500 transition-colors font-mono text-sm"
+        placeholder={`Type your code solution here...
+        
+You can include:
+- Function definitions
+- Algorithm explanations
+- Code snippets
+- Time/space complexity analysis
+- Example inputs/outputs`}
+        value={answerInput}
+        onChange={(e) => setAnswerInput(e.target.value)}
+      />
+      
+      <div className="text-gray-400 text-sm flex items-center gap-2">
+        <span className="text-emerald-500">💡 Tip:</span>
+        <span>Include comments in your code to explain your thought process</span>
+      </div>
+    </>
+  )}
+</div>
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4 mt-8">
