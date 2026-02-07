@@ -275,7 +275,7 @@ export default function Test() {
     speakText(questions[currentIndex]);
   };
 
-  co// In Test.jsx, update the handleEndTest function:
+// In Test.jsx, update the handleEndTest function:
 const handleEndTest = async () => {
   const token = localStorage.getItem("token");
   if (!token) {
