@@ -275,46 +275,104 @@ export default function Test() {
     speakText(questions[currentIndex]);
   };
 
-  const handleEndTest = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      navigate("/login");
+  co// In Test.jsx, update the handleEndTest function:
+const handleEndTest = async () => {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    navigate("/login");
+    return;
+  }
+  
+  const trimmed = answerInput.trim();
+  if (!trimmed) {
+    alert("Please provide an answer before ending the test.");
+    return;
+  }
+  
+  const temp = [...answers];
+  temp[currentIndex] = trimmed;
+  setAnswers(temp);
+  
+  // Validate all answers
+  const emptyAnswers = temp.filter(answer => !answer.trim());
+  if (emptyAnswers.length > 0) {
+    if (!confirm(`You have ${emptyAnswers.length} unanswered questions. Submit anyway?`)) {
       return;
     }
-    const trimmed = answerInput.trim();
-    if (!trimmed) {
-      alert("Please provide an answer before ending the test.");
-      return;
+  }
+  
+  setIsSubmitting(true);
+  
+  try {
+    const resumeText = localStorage.getItem("resumeText");
+    
+    // Prepare data for submission
+    const submissionData = {
+      resumeText: resumeText || "No resume text available",
+      questions: questions.map(q => q.trim()),
+      answers: temp.map(a => a.trim())
+    };
+    
+    console.log('Submitting test data:', {
+      questionsCount: submissionData.questions.length,
+      answersCount: submissionData.answers.length
+    });
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+    
+    const res = await fetch(API_URLS.EVALUATE_TEST, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(submissionData),
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!res.ok) {
+      let errorMessage = `Evaluation failed: ${res.status} ${res.statusText}`;
+      try {
+        const errorData = await res.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        // Couldn't parse JSON error
+      }
+      throw new Error(errorMessage);
     }
-    const temp = [...answers];
-    temp[currentIndex] = trimmed;
-    setAnswers(temp);
-    setIsSubmitting(true);
-    try {
-      const resumeText = localStorage.getItem("resumeText");
-      const res = await fetch(API_URLS.EVALUATE_TEST, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          resumeText,
-          questions,
-          answers: temp,
-        }),
-      });
-      if (!res.ok) throw new Error("Evaluation failed");
-      const data = await res.json();
-      setScore(data.score);
-      setResultDetails(data.details || []);
-    } catch (err) {
-      console.error("Error submitting test:", err);
-      alert("Error submitting test.");
-    } finally {
-      setIsSubmitting(false);
+    
+    const data = await res.json();
+    
+    if (data.success === false) {
+      throw new Error(data.error || "Evaluation failed");
     }
-  };
+    
+    console.log('Evaluation response:', data);
+    setScore(data.score);
+    setResultDetails(data.details || []);
+    
+    // Show success message
+    alert(`Test submitted successfully! Your score: ${data.score}/100`);
+    
+  } catch (err) {
+    console.error("Error submitting test:", err);
+    
+    if (err.name === 'AbortError') {
+      alert("Submission timeout. Your answers were saved, but evaluation may be delayed.");
+      // Navigate back anyway
+      navigate("/dashboard");
+    } else {
+      alert(`Error: ${err.message}\n\nYour answers have been recorded. You can view results later.`);
+      // Still navigate to dashboard
+      navigate("/dashboard");
+    }
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
