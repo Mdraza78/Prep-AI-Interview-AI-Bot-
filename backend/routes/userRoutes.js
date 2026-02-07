@@ -16,49 +16,49 @@ async function generateInterviewQuestion(prompt) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
     const body = {
-      contents: [
-        {
-          parts: [{ text: prompt }]
-        }
-      ],
+      contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         maxOutputTokens: 200,
-        temperature: 0.7
+        temperature: 0.8, // Slightly higher for more variation
+        topP: 0.9
       }
     };
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-goog-api-key': GEMINI_API_KEY 
+      },
       body: JSON.stringify(body),
-      timeout: 10000 // 10 second timeout
+      timeout: 15000
     });
 
     if (!response.ok) {
-      console.error(`Gemini API error: ${response.status} ${response.statusText}`);
+      const errorData = await response.json();
+      console.error(`Gemini API error: ${response.status}`, errorData);
       
-      // If 429 (rate limit), wait and retry
+      // Specific error handling
       if (response.status === 429) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        // You could implement a retry logic here
+        throw new Error('Rate limit exceeded. Please try again in a moment.');
+      } else if (response.status === 400) {
+        throw new Error('Invalid request to AI service.');
+      } else {
+        throw new Error(`AI service error: ${response.status}`);
       }
-      
-      throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
     
-    // Validate response structure
     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      console.warn('Unexpected Gemini response structure:', data);
-      return "Could you describe your relevant experience for this role?";
+      console.warn('Unexpected AI response structure:', data);
+      return "Could you describe your experience relevant to this role?";
     }
     
     return data.candidates[0].content.parts[0].text.trim();
   } catch (error) {
     console.error('Error in generateInterviewQuestion:', error.message);
-    // Return a fallback question
-    return "Based on your resume, what skills would you bring to this role?";
+    throw error; // Re-throw to be handled by caller
   }
 }
 
@@ -190,8 +190,6 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Evaluate test route
-// Evaluate test route - AI powered
 router.post('/evaluate-test', authenticateToken, async (req, res) => {
   try {
     const { resumeText, questions, answers } = req.body;
@@ -199,75 +197,164 @@ router.post('/evaluate-test', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Missing data." });
     }
 
+    // Validate arrays have same length
+    if (questions.length !== answers.length) {
+      return res.status(400).json({ error: "Questions and answers count mismatch" });
+    }
+
     let totalScore = 0;
     let details = [];
-    const userId = req.user.userId; // from JWT
+    const userId = req.user.userId;
 
+    // Process questions sequentially with delays
     for (let i = 0; i < questions.length; i++) {
       const question = questions[i];
       const answer = answers[i] || "No answer given";
 
       const prompt = `
-You are an experienced technical interviewer.
-Here is the candidate's resume context:
+You are an experienced technical interviewer. Score the candidate's answer.
+
+RESUME CONTEXT:
 ${resumeText}
 
-Question: ${question}
-Candidate Answer: ${answer}
+QUESTION: ${question}
 
-Score this answer from 0 to 20 based on:
-1. Technical correctness
-2. Completeness
-3. Clarity of explanation
-4. Relevance to the question
+CANDIDATE'S ANSWER: ${answer}
 
-First line: ONLY the score (number between 0 and 20)
-Second line: A short constructive feedback on how to improve.
+INSTRUCTIONS:
+1. Score this answer from 0 to 20 (whole number only)
+2. Consider: Technical correctness, Completeness, Clarity, Relevance
+3. First line must be ONLY the numeric score (0-20)
+4. Second line must be constructive feedback (1-2 sentences)
+
+EXAMPLE:
+15
+Good explanation but could use more specific examples from the resume.
+
+Now score this answer:
 `;
 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
-      const body = { contents: [{ parts: [{ text: prompt }] }] };
+      
+      const requestBody = {
+        contents: [{ 
+          parts: [{ text: prompt }] 
+        }],
+        generationConfig: {
+          maxOutputTokens: 150,
+          temperature: 0.2
+        }
+      };
+
+      console.log(`Evaluating question ${i + 1}/${questions.length}`);
 
       const aiRes = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        headers: { 
+          "Content-Type": "application/json",
+          "x-goog-api-key": process.env.GEMINI_API_KEY 
+        },
+        body: JSON.stringify(requestBody)
       });
 
+      // Check if response is OK
       if (!aiRes.ok) {
-        const errorData = await aiRes.json();
-        console.error("Gemini API error:", errorData);
-        return res.status(500).json({ error: "AI evaluation failed" });
+        console.error(`API Error - Status: ${aiRes.status}`);
+        const errorText = await aiRes.text();
+        console.error(`API Error - Response:`, errorText);
+        
+        // Use fallback scoring
+        const fallbackScore = 10;
+        totalScore += fallbackScore;
+        details.push({
+          question,
+          answer,
+          individualScore: fallbackScore,
+          feedback: "Evaluation temporarily unavailable. Please try again later."
+        });
+        continue;
       }
 
       const aiData = await aiRes.json();
-      console.log("🔍 AI Raw Response:", JSON.stringify(aiData, null, 2));
+      
+      // Parse AI response
+      let aiText = "";
+      if (aiData.candidates && aiData.candidates[0] && aiData.candidates[0].content) {
+        aiText = aiData.candidates[0].content.parts[0].text || "";
+      }
+      
+      if (!aiText) {
+        console.warn(`Empty response for question ${i + 1}`);
+        aiText = "10\nUnable to evaluate at this time.";
+      }
 
-      let aiText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (!aiText) aiText = "0\nNo feedback provided.";
-
-      let [scoreLine, ...feedbackLines] = aiText.split("\n");
-      let numericScore = parseInt(scoreLine.trim(), 10);
-      if (isNaN(numericScore)) numericScore = 0;
-
+      aiText = aiText.trim();
+      
+      // Extract score and feedback
+      const lines = aiText.split('\n');
+      let numericScore = 10; // Default
+      let feedback = "No specific feedback available.";
+      
+      // Try to parse first line as score
+      if (lines.length > 0) {
+        const firstLine = lines[0].trim();
+        const scoreMatch = firstLine.match(/\b(\d{1,2})\b/);
+        if (scoreMatch) {
+          numericScore = parseInt(scoreMatch[1], 10);
+          numericScore = Math.min(Math.max(numericScore, 0), 20); // Clamp 0-20
+        }
+        
+        // Use second line as feedback if available
+        if (lines.length > 1) {
+          feedback = lines.slice(1).join(' ').trim();
+        } else {
+          feedback = "Feedback not provided.";
+        }
+      }
+      
       totalScore += numericScore;
-
+      
       details.push({
         question,
         answer,
         individualScore: numericScore,
-        feedback: feedbackLines.join(" ").trim(),
+        feedback: feedback || "No feedback provided."
       });
+
+      // Add delay between API calls to avoid rate limiting
+      if (i < questions.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
 
-    // ✅ Save to DB
-    await TestResult.create({ userId, totalScore, questions: details });
+    // Save to database
+    try {
+      const testResult = new TestResult({
+        userId,
+        totalScore,
+        questions: details
+      });
+      
+      await testResult.save();
+      console.log(`✅ Test result saved for user ${userId}, score: ${totalScore}`);
+    } catch (dbError) {
+      console.error("❌ Database save error:", dbError);
+      // Don't fail the request if DB save fails, still return score
+    }
 
-    res.json({ score: totalScore, details });
+    res.json({ 
+      success: true,
+      score: totalScore, 
+      details,
+      message: "Test evaluated successfully"
+    });
 
   } catch (err) {
-    console.error("❌ Failed to evaluate test via AI:", err);
-    res.status(500).json({ error: "Failed to evaluate test." });
+    console.error("❌ Critical error in evaluate-test:", err);
+    res.status(500).json({ 
+      error: "Failed to evaluate test.", 
+      details: err.message 
+    });
   }
 });
 
@@ -388,55 +475,115 @@ router.patch('/profile', authenticateToken, async (req, res) => {
 });
 
 
-// In userRoutes.jsx - Replace the start-interview route with this:
 router.post('/start-interview', authenticateToken, async (req, res) => {
   try {
     const { resumeText } = req.body;
     if (!resumeText) return res.status(400).json({ error: "Resume text required" });
 
-    const prompts = [
-      `Based on this resume: ${resumeText}\nAsk ONE easy technical question relevant to their skills. Return ONLY the question text.`,
-      `Based on this resume: ${resumeText}\nAsk ONE behavioral question about their work experience. Return ONLY the question text.`,
-      `Based on this resume: ${resumeText}\nAsk ONE problem-solving question related to their field. Return ONLY the question text.`,
-      `Based on this resume: ${resumeText}\nAsk ONE situational question about teamwork or challenges. Return ONLY the question text.`,
-      `Based on this resume: ${resumeText}\nAsk ONE technical coding or logic question. Return ONLY the question text.`
+    // Extract keywords from resume for more specific questions
+    const extractKeywords = (text) => {
+      const commonWords = new Set(['the', 'and', 'for', 'with', 'from', 'this', 'that', 'have', 'was', 'were']);
+      const words = text.toLowerCase().split(/\W+/);
+      const wordFreq = {};
+      
+      words.forEach(word => {
+        if (word.length > 3 && !commonWords.has(word)) {
+          wordFreq[word] = (wordFreq[word] || 0) + 1;
+        }
+      });
+      
+      return Object.entries(wordFreq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(entry => entry[0]);
+    };
+
+    const keywords = extractKeywords(resumeText);
+    console.log("Extracted keywords:", keywords);
+
+    // Create diverse question prompts based on resume
+    const questionTypes = [
+      {
+        type: "Technical Skills",
+        prompt: `Based on this resume: ${resumeText}\nGenerate ONE specific technical question about ${keywords[0] || 'their technical skills'} that would be relevant for a job interview. Make it challenging but fair.`
+      },
+      {
+        type: "Behavioral",
+        prompt: `Based on this resume: ${resumeText}\nAsk ONE behavioral interview question about a time they demonstrated ${keywords[1] || 'problem-solving'} skills in a professional context.`
+      },
+      {
+        type: "Problem-Solving",
+        prompt: `Based on this resume: ${resumeText}\nCreate ONE scenario-based problem-solving question related to ${keywords[2] || 'their field'} that tests analytical thinking.`
+      },
+      {
+        type: "Situational",
+        prompt: `Based on this resume: ${resumeText}\nGenerate ONE situational question about handling ${keywords[3] || 'a challenging'} situation in a team environment.`
+      },
+      {
+        type: "Technical Coding",
+        prompt: `Based on this resume: ${resumeText}\nCreate ONE technical/coding question at an intermediate level related to ${keywords[4] || 'programming'}. Include a small code scenario if relevant.`
+      }
     ];
 
-    // Sequential calls with delays to avoid rate limiting
+    // Generate questions with better error handling
     const questions = [];
-    for (let i = 0; i < prompts.length; i++) {
+    
+    for (let i = 0; i < questionTypes.length; i++) {
       try {
-        const question = await generateInterviewQuestion(prompts[i]);
-        questions.push(question);
+        const questionType = questionTypes[i];
+        console.log(`Generating ${questionType.type} question...`);
         
-        // Add delay between calls (500ms to 1s)
-        if (i < prompts.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        const question = await generateInterviewQuestion(questionType.prompt);
+        
+        if (question && question.trim().length > 10) {
+          questions.push(question.trim());
+        } else {
+          // Fallback question for this type
+          questions.push(getFallbackQuestion(i, keywords));
+        }
+        
+        // Add delay to avoid rate limiting
+        if (i < questionTypes.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
         }
       } catch (error) {
         console.error(`Error generating question ${i + 1}:`, error);
-        // Provide fallback questions
-        questions.push(`Tell me about your experience with ${resumeText.includes('JavaScript') ? 'JavaScript' : 'your technical skills'}.`);
+        questions.push(getFallbackQuestion(i, keywords));
       }
     }
 
-    // Ensure we always have 5 questions
+    // Ensure we have exactly 5 questions
     while (questions.length < 5) {
-      questions.push("How would you approach solving a complex problem in your field?");
+      questions.push(getFallbackQuestion(questions.length, keywords));
     }
 
+    console.log("Generated questions:", questions);
     res.json({ questions });
+
   } catch (err) {
     console.error('Interview Generation Error:', err);
-    // Provide fallback questions if API fails
+    // Comprehensive fallback questions
     const fallbackQuestions = [
-      "Tell me about yourself and your professional background.",
-      "What are your greatest strengths and weaknesses?",
-      "Describe a challenging project you worked on.",
-      "How do you handle tight deadlines and pressure?",
-      "Where do you see yourself in 5 years?"
+      "Based on your resume, describe your most challenging technical project and what you learned from it.",
+      "Tell me about a time you had to explain a complex technical concept to a non-technical stakeholder.",
+      "Describe a situation where you had to troubleshoot a difficult problem under time pressure.",
+      "How do you stay updated with the latest technologies and trends in your field?",
+      "Walk me through how you would design a solution for [mention a common problem in their field]."
     ];
     res.json({ questions: fallbackQuestions });
   }
 });
+
+// Helper function for fallback questions
+function getFallbackQuestion(index, keywords) {
+  const fallbacks = [
+    `What experience do you have with ${keywords[0] || 'key technologies'} mentioned in your resume?`,
+    `Describe a project where you used ${keywords[1] || 'your skills'} to solve a real-world problem.`,
+    `How would you approach learning a new ${keywords[2] || 'technology'} quickly for a project?`,
+    `Tell me about a time you faced a significant challenge while working with ${keywords[3] || 'a team'}.`,
+    `Explain ${keywords[4] || 'a technical concept'} as if you were teaching it to a junior developer.`
+  ];
+  
+  return fallbacks[index % fallbacks.length];
+}
 module.exports = router;
