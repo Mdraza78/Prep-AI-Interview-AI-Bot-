@@ -11,32 +11,55 @@ const pdfParse = require('pdf-parse');
 const router = express.Router();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// Your existing helper function for Gemini question generation...
-async function generateInterviewQuestion(resumeText) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+async function generateInterviewQuestion(prompt) {
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-  const prompt = `Given this resume text, ask one strong, relevant interview question that tests the candidate's skills and experience. Only return one question, do not include explanations:\n\n${resumeText}`;
-
-  const body = {
-    contents: [
-      {
-        parts: [{ text: prompt }]
+    const body = {
+      contents: [
+        {
+          parts: [{ text: prompt }]
+        }
+      ],
+      generationConfig: {
+        maxOutputTokens: 200,
+        temperature: 0.7
       }
-    ]
-  };
+    };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      timeout: 10000 // 10 second timeout
+    });
 
-  const data = await response.json();
-  if (!response.ok) {
-    console.error("Gemini error details:", data);
-    throw new Error(data.error?.message || 'Gemini API error');
+    if (!response.ok) {
+      console.error(`Gemini API error: ${response.status} ${response.statusText}`);
+      
+      // If 429 (rate limit), wait and retry
+      if (response.status === 429) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        // You could implement a retry logic here
+      }
+      
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // Validate response structure
+    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.warn('Unexpected Gemini response structure:', data);
+      return "Could you describe your relevant experience for this role?";
+    }
+    
+    return data.candidates[0].content.parts[0].text.trim();
+  } catch (error) {
+    console.error('Error in generateInterviewQuestion:', error.message);
+    // Return a fallback question
+    return "Based on your resume, what skills would you bring to this role?";
   }
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "Could not generate question.";
 }
 
 // Middleware for JWT authentication
@@ -365,39 +388,55 @@ router.patch('/profile', authenticateToken, async (req, res) => {
 });
 
 
-// Start interview questions route (your existing code)
-router.post('/start-interview', async (req, res) => {
+// In userRoutes.jsx - Replace the start-interview route with this:
+router.post('/start-interview', authenticateToken, async (req, res) => {
   try {
     const { resumeText } = req.body;
-    if (!resumeText) {
-      return res.status(400).json({ error: "Resume text is required" });
-    }
+    if (!resumeText) return res.status(400).json({ error: "Resume text required" });
 
-    async function getGeminiQuestion(type) {
-      let prompt;
-      if (type === "easy") {
-        prompt = `Given this resume: ${resumeText}\nAsk ONE easy technical question (not coding) relevant to this candidate. Only return the question, do NOT add explanations.`;
-      } else if (type === "output") {
-        prompt = `Given this resume: ${resumeText}\nAsk ONE medium JavaScript interview question: provide a code snippet and ask the candidate "What is the output of the code and why?" Only return the question and code block, no explanations.`;
-      } else if (type === "easycode") {
-        prompt = `Given this resume: ${resumeText}\nAsk ONE simple coding interview question that requires the user to describe the logic in words (not write real code). Only give the question, no explanation.`;
-      }
-      return await generateInterviewQuestion(prompt);
-    }
-
-    const questions = [
-      await getGeminiQuestion("easy"),
-      await getGeminiQuestion("easy"),
-      await getGeminiQuestion("output"),
-      await getGeminiQuestion("output"),
-      await getGeminiQuestion("easycode"),
+    const prompts = [
+      `Based on this resume: ${resumeText}\nAsk ONE easy technical question relevant to their skills. Return ONLY the question text.`,
+      `Based on this resume: ${resumeText}\nAsk ONE behavioral question about their work experience. Return ONLY the question text.`,
+      `Based on this resume: ${resumeText}\nAsk ONE problem-solving question related to their field. Return ONLY the question text.`,
+      `Based on this resume: ${resumeText}\nAsk ONE situational question about teamwork or challenges. Return ONLY the question text.`,
+      `Based on this resume: ${resumeText}\nAsk ONE technical coding or logic question. Return ONLY the question text.`
     ];
+
+    // Sequential calls with delays to avoid rate limiting
+    const questions = [];
+    for (let i = 0; i < prompts.length; i++) {
+      try {
+        const question = await generateInterviewQuestion(prompts[i]);
+        questions.push(question);
+        
+        // Add delay between calls (500ms to 1s)
+        if (i < prompts.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        console.error(`Error generating question ${i + 1}:`, error);
+        // Provide fallback questions
+        questions.push(`Tell me about your experience with ${resumeText.includes('JavaScript') ? 'JavaScript' : 'your technical skills'}.`);
+      }
+    }
+
+    // Ensure we always have 5 questions
+    while (questions.length < 5) {
+      questions.push("How would you approach solving a complex problem in your field?");
+    }
 
     res.json({ questions });
   } catch (err) {
-    console.error('Failed to generate interview questions:', err);
-    res.status(500).json({ error: 'Failed to generate interview questions' });
+    console.error('Interview Generation Error:', err);
+    // Provide fallback questions if API fails
+    const fallbackQuestions = [
+      "Tell me about yourself and your professional background.",
+      "What are your greatest strengths and weaknesses?",
+      "Describe a challenging project you worked on.",
+      "How do you handle tight deadlines and pressure?",
+      "Where do you see yourself in 5 years?"
+    ];
+    res.json({ questions: fallbackQuestions });
   }
 });
-
 module.exports = router;
