@@ -93,26 +93,54 @@ export default function Test() {
   const [error, setError] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [retryMessage, setRetryMessage] = useState("");
-  const [debugInfo, setDebugInfo] = useState("");
+  const [debugPanel, setDebugPanel] = useState({
+    show: false,
+    logs: []
+  });
 
   const userName = localStorage.getItem("name") || "User";
   const navigate = useNavigate();
   const recognitionRef = useRef(null);
   const speechSynthesisRef = useRef(null);
 
-  // Improved speech synthesis function
+  // Function to add debug logs
+  const addDebugLog = (type, message, data = null) => {
+    const log = {
+      timestamp: new Date().toISOString(),
+      type,
+      message,
+      data
+    };
+    
+    // Log to browser console with colors
+    if (type === 'error') {
+      console.error(`%c[ERROR] ${message}`, 'color: #ff6b6b', data || '');
+    } else if (type === 'warning') {
+      console.warn(`%c[WARNING] ${message}`, 'color: #ffd93d', data || '');
+    } else if (type === 'success') {
+      console.log(`%c[SUCCESS] ${message}`, 'color: #6bcb77', data || '');
+    } else {
+      console.log(`%c[INFO] ${message}`, 'color: #4d96ff', data || '');
+    }
+    
+    // Store for UI debug panel
+    setDebugPanel(prev => ({
+      ...prev,
+      logs: [log, ...prev.logs].slice(0, 50) // Keep last 50 logs
+    }));
+  };
+
+  // Improved speech synthesis
   const speakText = (text) => {
     if (!window.speechSynthesis) {
-      console.log('Speech synthesis not supported');
-      setDebugInfo('Speech synthesis not supported in this browser');
+      addDebugLog('warning', 'Speech synthesis not supported');
       return;
     }
 
-    // Cancel any ongoing speech
     try {
       window.speechSynthesis.cancel();
     } catch (e) {
-      console.error('Error canceling speech:', e);
+      addDebugLog('error', 'Error canceling speech:', e);
     }
 
     const utter = new SpeechSynthesisUtterance(text);
@@ -120,31 +148,27 @@ export default function Test() {
     utter.pitch = 1;
     utter.volume = 1;
     
-    // Wait for voices to be loaded
     const speak = () => {
       setIsSpeaking(true);
       utter.onend = () => {
         setIsSpeaking(false);
-        console.log('Speech finished');
+        addDebugLog('info', 'Speech finished');
       };
       utter.onerror = (event) => {
-        console.error('Speech synthesis error:', event);
+        addDebugLog('error', 'Speech synthesis error:', event.error);
         setIsSpeaking(false);
-        setDebugInfo(`Speech error: ${event.error}`);
       };
       
-      // Small delay to ensure cancel is processed
       setTimeout(() => {
         try {
           window.speechSynthesis.speak(utter);
         } catch (e) {
-          console.error('Error speaking:', e);
+          addDebugLog('error', 'Error speaking:', e);
           setIsSpeaking(false);
         }
       }, 100);
     };
 
-    // Check if voices are loaded
     if (window.speechSynthesis.getVoices().length === 0) {
       window.speechSynthesis.onvoiceschanged = () => {
         speak();
@@ -165,7 +189,7 @@ export default function Test() {
       recognition.lang = "en-US";
 
       recognition.onstart = () => {
-        console.log('Recording started');
+        addDebugLog('info', '🎤 Recording started');
         setIsRecording(true);
       };
       
@@ -174,53 +198,50 @@ export default function Test() {
         for (let i = event.resultIndex; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
         }
-        console.log('Transcript:', transcript);
+        addDebugLog('info', '📝 Transcript received:', transcript);
         setAnswerInput(transcript.trim());
       };
       
       recognition.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
+        addDebugLog('error', 'Speech recognition error:', event.error);
         setIsRecording(false);
-        setDebugInfo(`Speech recognition error: ${event.error}`);
         if (event.error === "not-allowed") {
           alert("Microphone access denied. Please allow microphone permission.");
         }
       };
       
       recognition.onend = () => {
-        console.log('Recording ended');
+        addDebugLog('info', '🎤 Recording ended');
         setIsRecording(false);
       };
       
       recognitionRef.current = recognition;
     } else {
-      setDebugInfo('Speech recognition not supported in this browser');
+      addDebugLog('warning', 'Speech recognition not supported in this browser');
     }
 
-    // Fetch questions
     async function fetchQuestions() {
       setIsLoadingQuestions(true);
-      setError(null);
-      setDebugInfo("Fetching questions from server...");
+      addDebugLog('info', '🚀 Starting interview preparation...');
       
       try {
         const token = localStorage.getItem("token");
         if (!token) {
-          console.error("No token found");
+          addDebugLog('error', 'No authentication token found');
           navigate("/login");
           return;
         }
         
         const resumeText = localStorage.getItem("resumeText");
         if (!resumeText) {
-          console.error("No resume text found");
+          addDebugLog('error', 'No resume text found');
           alert("No resume text found. Please upload your resume first.");
           navigate("/dashboard");
           return;
         }
         
-        console.log("Sending request to:", API_URLS.START_INTERVIEW);
-        console.log("Resume text length:", resumeText.length);
+        addDebugLog('info', '📄 Resume text length:', resumeText.length);
+        addDebugLog('info', '🔗 API URL:', API_URLS.START_INTERVIEW);
         
         const res = await fetch(API_URLS.START_INTERVIEW, {
           method: "POST",
@@ -231,36 +252,65 @@ export default function Test() {
           body: JSON.stringify({ resumeText }),
         });
         
-        console.log("Response status:", res.status);
+        addDebugLog('info', '📡 Response status:', res.status);
         
         if (!res.ok) {
           const errorData = await res.json();
-          console.error("Error response:", errorData);
+          addDebugLog('error', 'API error response:', errorData);
           throw new Error(errorData.error || `Failed to fetch questions (Status: ${res.status})`);
         }
         
         const data = await res.json();
-        console.log("Questions received:", data);
-        setDebugInfo(`Received ${data.questions?.length || 0} questions`);
+        
+        // Log full API response to browser console
+        addDebugLog('success', '=' .repeat(60));
+        addDebugLog('success', '📡 FULL API RESPONSE FROM BACKEND:');
+        addDebugLog('success', '=' .repeat(60));
+        console.log("Complete API Response:", JSON.stringify(data, null, 2));
+        
+        if (data.debug) {
+          addDebugLog('info', '🔍 Debug Info:', data.debug);
+          
+          // Show Gemini's raw response if available
+          if (data.debug.geminiResponse) {
+            addDebugLog('success', '🤖 GEMINI RAW RESPONSE:');
+            addDebugLog('info', '-' .repeat(40));
+            console.log("Gemini Raw Response:", data.debug.geminiResponse);
+            addDebugLog('info', '-' .repeat(40));
+          }
+          
+          if (data.debug.error) {
+            addDebugLog('error', '❌ Gemini Error:', data.debug.error);
+          }
+          
+          if (data.debug.fallback) {
+            addDebugLog('warning', '⚠️ Using fallback questions due to API issues');
+          }
+        }
+        
+        addDebugLog('success', '=' .repeat(60));
+        addDebugLog('success', `📋 Received ${data.questions?.length || 0} questions`);
         
         if (data.questions && data.questions.length === 5) {
           setQuestions(data.questions);
           setAnswers(Array(data.questions.length).fill(""));
           setAnswerInput("");
           
-          // Small delay before speaking first question
+          // Log each question
+          data.questions.forEach((q, idx) => {
+            addDebugLog('info', `📌 Question ${idx + 1}:`, q.substring(0, 100));
+          });
+          
           setTimeout(() => {
-            console.log("Speaking first question:", data.questions[0]);
             speakText(data.questions[0]);
           }, 500);
         } else {
-          console.warn("Unexpected number of questions:", data.questions?.length);
+          addDebugLog('warning', `⚠️ Expected 5 questions, got ${data.questions?.length || 0}`);
           alert(`Unexpected number of questions received. Expected 5, got ${data.questions?.length || 0}.`);
         }
       } catch (err) {
-        console.error("Error fetching questions:", err);
+        addDebugLog('error', '❌ Error fetching questions:', err.message);
         setError(err.message || "Error fetching questions!");
-        setDebugInfo(`Error: ${err.message}`);
       } finally {
         setIsLoadingQuestions(false);
       }
@@ -298,7 +348,6 @@ export default function Test() {
     }
 
     try {
-      // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
 
@@ -306,14 +355,13 @@ export default function Test() {
       setAnswerInput("");
       recognitionRef.current.start();
 
-      // Auto-stop after 30 seconds
       setTimeout(() => {
         if (recognitionRef.current && isRecording) {
           recognitionRef.current.stop();
         }
       }, 30000);
     } catch (err) {
-      console.error("Error starting recording:", err);
+      addDebugLog('error', 'Error starting recording:', err);
       setIsRecording(false);
       if (err.name === "NotAllowedError") {
         alert("Microphone access denied. Please allow microphone permission.");
@@ -385,7 +433,7 @@ export default function Test() {
     setIsSubmitting(true);
     setError(null);
     setRetryMessage("");
-    setDebugInfo("Submitting answers for evaluation...");
+    addDebugLog('info', '📤 Submitting answers for evaluation...');
     
     let retryCount = 0;
     const maxRetries = 3;
@@ -393,7 +441,6 @@ export default function Test() {
     const submitEvaluation = async () => {
       try {
         const resumeText = localStorage.getItem("resumeText");
-        console.log("Submitting evaluation with", questions.length, "questions");
         
         const res = await fetch(API_URLS.EVALUATE_TEST, {
           method: "POST",
@@ -408,36 +455,34 @@ export default function Test() {
           }),
         });
         
-        console.log("Evaluation response status:", res.status);
+        addDebugLog('info', '📡 Evaluation response status:', res.status);
         
         // Handle rate limiting with retry
         if (res.status === 429 && retryCount < maxRetries) {
           retryCount++;
           const delay = 4000 * retryCount;
           setRetryMessage(`⚠️ Rate limit reached. Retrying in ${delay/1000} seconds... (Attempt ${retryCount}/${maxRetries})`);
-          setDebugInfo(`Rate limited, retrying in ${delay/1000}s...`);
+          addDebugLog('warning', `Rate limited, retrying in ${delay/1000}s...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           return submitEvaluation();
         }
         
         if (!res.ok) {
           const errorData = await res.json();
-          console.error("Evaluation error:", errorData);
+          addDebugLog('error', 'Evaluation error:', errorData);
           throw new Error(errorData.error || `Evaluation failed (Status: ${res.status})`);
         }
         
         const data = await res.json();
-        console.log("Evaluation results:", data);
+        addDebugLog('success', '✅ Evaluation complete! Score:', data.score);
         setScore(data.score);
         setResultDetails(data.details || []);
         setShowFeedback(true);
         setError(null);
         setRetryMessage("");
-        setDebugInfo(`Evaluation complete! Score: ${data.score}/100`);
       } catch (err) {
-        console.error("Error submitting test:", err);
+        addDebugLog('error', '❌ Error submitting test:', err.message);
         setError(err.message || "Error submitting test. Please try again.");
-        setDebugInfo(`Submission error: ${err.message}`);
         setIsSubmitting(false);
       }
     };
@@ -445,6 +490,44 @@ export default function Test() {
     await submitEvaluation();
     setIsSubmitting(false);
   };
+
+  // Debug Panel Component
+  const DebugPanel = () => (
+    <div className="fixed bottom-4 right-4 z-50">
+      <button
+        onClick={() => setDebugPanel(prev => ({ ...prev, show: !prev.show }))}
+        className="bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg text-sm hover:bg-gray-700 transition-colors"
+      >
+        {debugPanel.show ? '🔽 Hide Debug' : '🔍 Show Debug'} ({debugPanel.logs.length})
+      </button>
+      
+      {debugPanel.show && (
+        <div className="absolute bottom-12 right-0 w-96 max-h-96 overflow-y-auto bg-gray-900 border border-gray-700 rounded-lg shadow-xl">
+          <div className="sticky top-0 bg-gray-800 px-3 py-2 border-b border-gray-700">
+            <h3 className="text-xs font-semibold text-gray-300">Debug Console</h3>
+          </div>
+          <div className="p-2 space-y-1">
+            {debugPanel.logs.map((log, idx) => (
+              <div key={idx} className="text-xs border-b border-gray-800 py-1">
+                <span className="text-gray-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                {' '}
+                <span className={
+                  log.type === 'error' ? 'text-red-400' :
+                  log.type === 'warning' ? 'text-yellow-400' :
+                  log.type === 'success' ? 'text-emerald-400' :
+                  'text-blue-400'
+                }>
+                  [{log.type.toUpperCase()}]
+                </span>
+                {' '}
+                <span className="text-gray-300">{log.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   if (score !== null && showFeedback) {
     return (
@@ -564,6 +647,8 @@ export default function Test() {
             </div>
           </div>
         </footer>
+        
+        <DebugPanel />
       </div>
     );
   }
@@ -612,13 +697,6 @@ export default function Test() {
 
       <main className="flex-1 w-full py-6 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
-          {/* Debug info (hidden in production, remove if not needed) */}
-          {debugInfo && (
-            <div className="mb-4 p-2 bg-blue-600/20 border border-blue-600 rounded-lg text-blue-400 text-xs text-center">
-              🔍 Debug: {debugInfo}
-            </div>
-          )}
-          
           {error && (
             <div className="mb-4 p-4 bg-red-600/20 border border-red-600 rounded-lg text-red-400 text-center">
               ❌ {error}
@@ -774,6 +852,8 @@ export default function Test() {
           </div>
         </div>
       </footer>
+      
+      <DebugPanel />
     </div>
   );
 }

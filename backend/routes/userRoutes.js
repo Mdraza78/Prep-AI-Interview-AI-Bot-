@@ -16,7 +16,7 @@ function logWithTimestamp(...args) {
   console.log(`[${timestamp}]`, ...args);
 }
 
-// Utility function for Gemini API calls with comprehensive logging
+// Utility function for Gemini API calls with retry logic
 async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
   if (!GEMINI_API_KEY) {
     logWithTimestamp('❌ ERROR: GEMINI_API_KEY is not set in environment variables');
@@ -40,7 +40,6 @@ async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
   };
   
   logWithTimestamp(`📡 Calling Gemini API (Attempt ${retryCount + 1}/${maxRetries + 1})...`);
-  logWithTimestamp(`📝 Prompt length: ${prompt.length} characters`);
   
   try {
     const controller = new AbortController();
@@ -59,12 +58,11 @@ async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
     
     logWithTimestamp(`📊 API Response Status: ${response.status} ${response.statusText}`);
     
-    // Handle rate limiting
+    // Handle rate limiting with exponential backoff
     if (response.status === 429) {
-      logWithTimestamp(`⚠️ Rate limit hit (429). Retry count: ${retryCount}`);
       if (retryCount < maxRetries) {
         const delay = Math.min(2000 * Math.pow(2, retryCount) + Math.random() * 1000, 15000);
-        logWithTimestamp(`⏳ Waiting ${delay}ms before retry...`);
+        logWithTimestamp(`⚠️ Rate limit hit. Retry ${retryCount + 1}/${maxRetries} in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return callGeminiAPI(prompt, retryCount + 1, maxRetries);
       } else {
@@ -79,16 +77,14 @@ async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
     }
     
     const data = await response.json();
-    logWithTimestamp(`📦 API Response received, structure:`, Object.keys(data));
     
-    // Check response structure
     if (!data.candidates || !data.candidates[0]) {
-      logWithTimestamp(`❌ No candidates in response. Full response:`, JSON.stringify(data, null, 2));
+      logWithTimestamp(`❌ No candidates in response`);
       throw new Error('No candidates in API response');
     }
     
     if (!data.candidates[0].content || !data.candidates[0].content.parts) {
-      logWithTimestamp(`❌ Invalid content structure. Candidate:`, JSON.stringify(data.candidates[0], null, 2));
+      logWithTimestamp(`❌ Invalid content structure`);
       throw new Error('Invalid content structure in API response');
     }
     
@@ -100,20 +96,16 @@ async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
     }
     
     logWithTimestamp(`✅ API Response Success (${generatedText.length} chars)`);
-    logWithTimestamp(`📝 Response Preview:`, generatedText.substring(0, 500));
-    
     return generatedText.trim();
     
   } catch (error) {
     logWithTimestamp(`❌ API Call Error:`, error.message);
-    logWithTimestamp(`Error stack:`, error.stack);
     
     if (retryCount < maxRetries && 
         (error.name === 'AbortError' || 
          error.message.includes('network') || 
          error.message.includes('fetch') ||
-         error.message.includes('timeout') ||
-         error.message.includes('ECONNRESET'))) {
+         error.message.includes('timeout'))) {
       const delay = 2000 * Math.pow(2, retryCount);
       logWithTimestamp(`⚠️ Retrying in ${delay}ms... (${retryCount + 1}/${maxRetries})`);
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -121,6 +113,46 @@ async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
     }
     throw error;
   }
+}
+
+// Helper function to generate fallback questions based on resume
+function generateResumeBasedQuestions(resumeText) {
+  const resume = resumeText.toLowerCase();
+  
+  // Detect technologies
+  const techs = [];
+  const techKeywords = {
+    'react': 'React',
+    'node': 'Node.js',
+    'python': 'Python',
+    'java': 'Java',
+    'javascript': 'JavaScript',
+    'typescript': 'TypeScript',
+    'mongodb': 'MongoDB',
+    'sql': 'SQL',
+    'aws': 'AWS',
+    'docker': 'Docker',
+    'kubernetes': 'Kubernetes',
+    'graphql': 'GraphQL',
+    'express': 'Express.js'
+  };
+  
+  for (const [key, value] of Object.entries(techKeywords)) {
+    if (resume.includes(key)) {
+      techs.push(value);
+    }
+  }
+  
+  const mainTech = techs[0] || 'relevant technologies';
+  const techList = techs.slice(0, 3).join(', ') || 'your technical stack';
+  
+  return [
+    `Based on your resume, can you tell me about your experience with ${techList}?`,
+    `I see you have experience with ${mainTech}. Can you describe a specific project where you used this technology and what challenges you faced?`,
+    `What do you consider your biggest technical achievement mentioned in your resume?`,
+    `How do you approach debugging and problem-solving in ${mainTech} development?`,
+    `Write a function to find the first non-repeating character in a string. Explain your approach and time complexity.`
+  ];
 }
 
 // Middleware for JWT authentication
@@ -149,7 +181,6 @@ router.post('/upload-resume', upload.single('resume'), async (req, res) => {
     const data = await pdfParse(pdfBuffer);
     
     logWithTimestamp(`📄 Resume parsed: ${data.text.length} characters`);
-    logWithTimestamp(`📄 Resume preview:`, data.text.substring(0, 300));
     
     res.json({ text: data.text });
   } catch (err) {
@@ -248,7 +279,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Evaluate test route
+// Evaluate test route - BATCH ALL QUESTIONS IN ONE API CALL
 router.post('/evaluate-test', authenticateToken, async (req, res) => {
   try {
     const { resumeText, questions, answers } = req.body;
@@ -268,9 +299,9 @@ router.post('/evaluate-test', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: "AI service not configured" });
     }
 
-    logWithTimestamp(`📊 Evaluating ${questions.length} questions...`);
+    logWithTimestamp(`📊 Evaluating ${questions.length} questions in a single batch request...`);
 
-    // Create evaluation prompt
+    // Create a single prompt that asks for evaluation of all questions at once
     let evaluationPrompt = `You are an experienced technical interviewer. Evaluate ALL the following interview answers based on the candidate's resume.
 
 CANDIDATE'S RESUME:
@@ -280,6 +311,7 @@ Here are the interview questions and the candidate's answers:
 
 `;
 
+    // Add all questions and answers to the prompt
     for (let i = 0; i < questions.length; i++) {
       evaluationPrompt += `
 QUESTION ${i + 1}:
@@ -293,7 +325,7 @@ ${answers[i] || "No answer given"}
     }
 
     evaluationPrompt += `
-IMPORTANT: Provide your evaluation in this EXACT format for EACH question:
+IMPORTANT: Provide your evaluation in the following EXACT format for EACH question:
 
 QUESTION 1:
 SCORE: [number 0-20]
@@ -303,11 +335,27 @@ QUESTION 2:
 SCORE: [number 0-20]
 FEEDBACK: [2-3 sentences of constructive feedback]
 
-(Continue for all questions)`;
+QUESTION 3:
+SCORE: [number 0-20]
+FEEDBACK: [2-3 sentences of constructive feedback]
+
+QUESTION 4:
+SCORE: [number 0-20]
+FEEDBACK: [2-3 sentences of constructive feedback]
+
+QUESTION 5:
+SCORE: [number 0-20]
+FEEDBACK: [2-3 sentences of constructive feedback]
+
+Provide scores between 0-20 for each question based on relevance, accuracy, completeness, and communication.`;
 
     try {
+      // Make a single API call for all questions
       const aiResponse = await callGeminiAPI(evaluationPrompt, 0, 3);
       
+      logWithTimestamp("✅ Batch evaluation completed");
+      
+      // Parse the response to extract scores and feedback for each question
       let totalScore = 0;
       let details = [];
       
@@ -315,7 +363,7 @@ FEEDBACK: [2-3 sentences of constructive feedback]
         let numericScore = 12;
         let feedback = "Your answer has been recorded.";
         
-        // Extract score
+        // Extract score for this question
         const scorePattern = new RegExp(`QUESTION ${i}:\\s*SCORE:\\s*(\\d{1,2})`, 'i');
         const scoreMatch = aiResponse.match(scorePattern);
         
@@ -324,7 +372,7 @@ FEEDBACK: [2-3 sentences of constructive feedback]
           numericScore = Math.min(Math.max(numericScore, 0), 20);
         }
         
-        // Extract feedback
+        // Extract feedback for this question
         const feedbackPattern = new RegExp(`QUESTION ${i}:[\\s\\S]*?FEEDBACK:\\s*([^\\n]+(?:\\n(?!QUESTION|SCORE:)[^\\n]+)*)`, 'i');
         const feedbackMatch = aiResponse.match(feedbackPattern);
         
@@ -340,18 +388,23 @@ FEEDBACK: [2-3 sentences of constructive feedback]
           individualScore: numericScore,
           feedback: feedback
         });
+        
+        logWithTimestamp(`📝 Question ${i}: Score ${numericScore}/20`);
       }
       
       // Save to database
-      const testResult = new TestResult({
-        userId,
-        totalScore,
-        questions: details,
-        createdAt: new Date()
-      });
-      await testResult.save();
-      
-      logWithTimestamp(`✅ Test saved: ${totalScore}/100`);
+      try {
+        const testResult = new TestResult({
+          userId,
+          totalScore,
+          questions: details,
+          createdAt: new Date()
+        });
+        await testResult.save();
+        logWithTimestamp(`✅ Test saved: ${totalScore}/100`);
+      } catch (dbError) {
+        console.error("❌ DB error:", dbError.message);
+      }
       
       res.json({ 
         success: true,
@@ -360,9 +413,9 @@ FEEDBACK: [2-3 sentences of constructive feedback]
       });
       
     } catch (error) {
-      logWithTimestamp(`❌ Evaluation error:`, error.message);
+      logWithTimestamp(`❌ AI evaluation error:`, error.message);
       
-      // Fallback evaluation
+      // Fallback: Provide default scores if AI fails
       let totalScore = 0;
       let details = [];
       
@@ -374,7 +427,7 @@ FEEDBACK: [2-3 sentences of constructive feedback]
           question: questions[i],
           answer: answers[i] || "No answer given",
           individualScore: defaultScore,
-          feedback: "Evaluation in progress. Your score will be updated shortly."
+          feedback: "Evaluation temporarily unavailable. Your answers have been recorded and will be evaluated later."
         });
       }
       
@@ -382,12 +435,12 @@ FEEDBACK: [2-3 sentences of constructive feedback]
         success: true,
         score: totalScore, 
         details: details,
-        warning: "Using preliminary evaluation"
+        warning: "Used fallback evaluation due to AI service issues"
       });
     }
 
   } catch (err) {
-    logWithTimestamp(`❌ Evaluation error:`, err);
+    logWithTimestamp(`❌ Error in evaluation:`, err);
     res.status(500).json({ error: "Failed to evaluate test. Please try again." });
   }
 });
@@ -501,7 +554,10 @@ router.post('/start-interview', authenticateToken, async (req, res) => {
     
     if (!resumeText) {
       logWithTimestamp('❌ No resume text provided');
-      return res.status(400).json({ error: "Resume text is required" });
+      return res.status(400).json({ 
+        error: "Resume text is required",
+        debug: { timestamp: new Date().toISOString() }
+      });
     }
 
     logWithTimestamp(`📝 Resume received: ${resumeText.length} characters`);
@@ -509,24 +565,36 @@ router.post('/start-interview', authenticateToken, async (req, res) => {
 
     if (!process.env.GEMINI_API_KEY) {
       logWithTimestamp("❌ GEMINI_API_KEY is missing from environment variables");
-      return res.status(500).json({ error: "AI service not configured" });
+      return res.status(500).json({ 
+        error: "AI service not configured",
+        debug: { hasApiKey: false }
+      });
     }
 
-    logWithTimestamp(`🔑 GEMINI_API_KEY exists: Yes (length: ${process.env.GEMINI_API_KEY.length})`);
+    const prompt = `You are an expert technical interviewer. Based on the following resume, generate exactly 5 interview questions.
 
-    // Simplified prompt for testing
-    const prompt = `Based on this resume, generate 5 interview questions. The 5th question should be a coding question.
+CRITICAL: 
+- Questions must be SPECIFIC to the candidate's skills and experience
+- Make questions challenging and thought-provoking
+- The 5th question MUST be a coding/algorithm question
+- Output ONLY the questions, numbered 1-5
+- No introductory text or explanations
 
-Resume: ${resumeText.substring(0, 2000)}
+RESUME:
+${resumeText.substring(0, 2500)}
 
-Output exactly 5 questions numbered 1-5:`;
+Generate 5 personalized interview questions:`;
 
     logWithTimestamp("🎯 Sending request to Gemini API...");
     
     try {
       const rawResponse = await callGeminiAPI(prompt, 0, 3);
       
-      logWithTimestamp(`✅ Raw API Response:`, rawResponse);
+      // Log the full response to server console
+      logWithTimestamp("✅ Gemini API Response:");
+      logWithTimestamp("=".repeat(50));
+      logWithTimestamp(rawResponse);
+      logWithTimestamp("=".repeat(50));
       
       // Parse questions
       let questions = [];
@@ -540,94 +608,78 @@ Output exactly 5 questions numbered 1-5:`;
         }
       }
       
-      // Method 2: If not enough, try other parsing
+      // Method 2: If not enough, try alternative parsing
       if (questions.length < 5) {
-        const allText = rawResponse.replace(/\d+\./g, '|').split('|');
-        for (const text of allText) {
+        const numberMatches = rawResponse.match(/\d+\.\s*([^\n]+)/g);
+        if (numberMatches) {
+          questions = numberMatches.map(q => q.replace(/^\d+\.\s*/, '').trim());
+        }
+      }
+      
+      // Method 3: If still not enough, try splitting by newlines
+      if (questions.length < 5) {
+        const textWithoutNumbers = rawResponse.replace(/\d+\./g, '|').split('|');
+        for (const text of textWithoutNumbers) {
           const trimmed = text.trim();
-          if (trimmed.length > 10 && trimmed.length < 200 && questions.length < 5) {
+          if (trimmed.length > 10 && trimmed.length < 300 && questions.length < 5) {
             questions.push(trimmed);
           }
         }
       }
       
       // Ensure we have exactly 5 questions
-      while (questions.length < 5) {
-        const defaultQuestions = [
-          "Can you tell me about your experience with the technologies mentioned in your resume?",
-          "Describe a challenging project you worked on and how you solved the problems.",
-          "What programming languages are you most comfortable with?",
-          "How do you approach problem-solving in software development?",
-          "Write a function to reverse a string. Explain your approach."
-        ];
-        questions.push(defaultQuestions[questions.length]);
+      if (questions.length !== 5) {
+        logWithTimestamp(`⚠️ Expected 5 questions, got ${questions.length}. Using fallback.`);
+        questions = generateResumeBasedQuestions(resumeText);
       }
       
-      questions = questions.slice(0, 5);
+      // Clean up questions
+      questions = questions.slice(0, 5).map(q => q.trim());
       
       logWithTimestamp(`✅ Generated ${questions.length} questions`);
       questions.forEach((q, i) => {
         logWithTimestamp(`   ${i + 1}. ${q.substring(0, 100)}`);
       });
       
-      res.json({ questions });
+      // Send response with debug info
+      res.json({ 
+        questions: questions,
+        debug: {
+          success: true,
+          geminiResponse: rawResponse,
+          parsedCount: questions.length,
+          timestamp: new Date().toISOString(),
+          apiKeyPresent: !!process.env.GEMINI_API_KEY
+        }
+      });
       
     } catch (error) {
       logWithTimestamp(`❌ AI generation error:`, error.message);
-      logWithTimestamp(`Error stack:`, error.stack);
       
-      // Use resume-based fallback questions
+      // Send fallback questions with error info
       const fallbackQuestions = generateResumeBasedQuestions(resumeText);
-      logWithTimestamp(`⚠️ Using ${fallbackQuestions.length} fallback questions`);
       
       res.json({ 
         questions: fallbackQuestions,
-        warning: "Using personalized fallback questions"
+        debug: {
+          success: false,
+          error: error.message,
+          fallback: true,
+          timestamp: new Date().toISOString()
+        }
       });
     }
     
   } catch (err) {
     logWithTimestamp(`❌ Start interview error:`, err);
-    logWithTimestamp(`Error stack:`, err.stack);
-    res.status(500).json({ error: "Failed to start interview. Please try again." });
+    res.status(500).json({ 
+      error: "Failed to start interview. Please try again.",
+      debug: {
+        message: err.message,
+        timestamp: new Date().toISOString()
+      }
+    });
   }
 });
-
-// Helper function to generate resume-based questions
-function generateResumeBasedQuestions(resumeText) {
-  const resume = resumeText.toLowerCase();
-  
-  // Detect technologies
-  const techs = [];
-  const techKeywords = {
-    'react': 'React',
-    'node': 'Node.js',
-    'python': 'Python',
-    'java': 'Java',
-    'javascript': 'JavaScript',
-    'typescript': 'TypeScript',
-    'mongodb': 'MongoDB',
-    'sql': 'SQL',
-    'aws': 'AWS',
-    'docker': 'Docker'
-  };
-  
-  for (const [key, value] of Object.entries(techKeywords)) {
-    if (resume.includes(key)) {
-      techs.push(value);
-    }
-  }
-  
-  const mainTech = techs[0] || 'relevant technologies';
-  const techList = techs.slice(0, 3).join(', ') || 'your technical stack';
-  
-  return [
-    `Based on your resume, can you tell me about your experience with ${techList}?`,
-    `I see you have experience with ${mainTech}. Can you describe a specific project where you used this technology?`,
-    `What do you consider your biggest technical achievement mentioned in your resume?`,
-    `How do you stay updated with the latest developments in ${mainTech}?`,
-    `Write a function to find duplicate elements in an array. Explain your approach and time complexity.`
-  ];
-}
 
 module.exports = router;
