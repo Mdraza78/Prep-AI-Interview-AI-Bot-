@@ -16,14 +16,22 @@ function logWithTimestamp(...args) {
   console.log(`[${timestamp}]`, ...args);
 }
 
-// Utility function for Gemini API calls with retry logic
+// Utility function for Gemini API calls with retry logic and model fallback
 async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
   if (!GEMINI_API_KEY) {
     logWithTimestamp('❌ ERROR: GEMINI_API_KEY is not set in environment variables');
     throw new Error('GEMINI_API_KEY is not configured');
   }
   
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  // Try different model names - start with gemini-pro
+  const modelsToTry = [
+    'gemini-pro',
+    'gemini-1.5-pro',
+    'gemini-1.5-flash'
+  ];
+  
+  const currentModel = modelsToTry[retryCount % modelsToTry.length];
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${GEMINI_API_KEY}`;
   
   const requestBody = {
     contents: [{ 
@@ -39,7 +47,7 @@ async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
     }
   };
   
-  logWithTimestamp(`📡 Calling Gemini API (Attempt ${retryCount + 1}/${maxRetries + 1})...`);
+  logWithTimestamp(`📡 Calling Gemini API with model: ${currentModel} (Attempt ${retryCount + 1}/${maxRetries + 1})...`);
   
   try {
     const controller = new AbortController();
@@ -70,6 +78,14 @@ async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
       }
     }
     
+    // Handle model not found - try next model
+    if (response.status === 404 && retryCount < maxRetries) {
+      logWithTimestamp(`⚠️ Model ${currentModel} not found, trying next model...`);
+      const delay = 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return callGeminiAPI(prompt, retryCount + 1, maxRetries);
+    }
+    
     if (!response.ok) {
       const errorText = await response.text();
       logWithTimestamp(`❌ API Error Response (${response.status}):`, errorText);
@@ -95,7 +111,7 @@ async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
       throw new Error('Empty response from API');
     }
     
-    logWithTimestamp(`✅ API Response Success (${generatedText.length} chars)`);
+    logWithTimestamp(`✅ API Response Success with model ${currentModel} (${generatedText.length} chars)`);
     return generatedText.trim();
     
   } catch (error) {
@@ -105,7 +121,8 @@ async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
         (error.name === 'AbortError' || 
          error.message.includes('network') || 
          error.message.includes('fetch') ||
-         error.message.includes('timeout'))) {
+         error.message.includes('timeout') ||
+         error.message.includes('ECONNRESET'))) {
       const delay = 2000 * Math.pow(2, retryCount);
       logWithTimestamp(`⚠️ Retrying in ${delay}ms... (${retryCount + 1}/${maxRetries})`);
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -134,7 +151,22 @@ function generateResumeBasedQuestions(resumeText) {
     'docker': 'Docker',
     'kubernetes': 'Kubernetes',
     'graphql': 'GraphQL',
-    'express': 'Express.js'
+    'express': 'Express.js',
+    'django': 'Django',
+    'flask': 'Flask',
+    'vue': 'Vue.js',
+    'angular': 'Angular',
+    'php': 'PHP',
+    'laravel': 'Laravel',
+    'c++': 'C++',
+    'c#': 'C#',
+    '.net': '.NET',
+    'go': 'Go',
+    'rust': 'Rust',
+    'swift': 'Swift',
+    'kotlin': 'Kotlin',
+    'flutter': 'Flutter',
+    'react native': 'React Native'
   };
   
   for (const [key, value] of Object.entries(techKeywords)) {
@@ -146,12 +178,25 @@ function generateResumeBasedQuestions(resumeText) {
   const mainTech = techs[0] || 'relevant technologies';
   const techList = techs.slice(0, 3).join(', ') || 'your technical stack';
   
+  // Extract skills from resume
+  const skills = [];
+  const skillKeywords = ['experienced', 'proficient', 'skilled', 'knowledge', 'familiar'];
+  skillKeywords.forEach(keyword => {
+    const regex = new RegExp(`${keyword}\\s+in\\s+([^.,]+)`, 'gi');
+    let match;
+    while ((match = regex.exec(resume)) !== null) {
+      skills.push(match[1].trim());
+    }
+  });
+  
+  const skillContext = skills.length > 0 ? `especially in ${skills.slice(0, 2).join(', ')}` : '';
+  
   return [
-    `Based on your resume, can you tell me about your experience with ${techList}?`,
+    `Based on your resume, can you tell me about your experience with ${techList}? ${skillContext}`,
     `I see you have experience with ${mainTech}. Can you describe a specific project where you used this technology and what challenges you faced?`,
-    `What do you consider your biggest technical achievement mentioned in your resume?`,
-    `How do you approach debugging and problem-solving in ${mainTech} development?`,
-    `Write a function to find the first non-repeating character in a string. Explain your approach and time complexity.`
+    `What do you consider your biggest technical achievement mentioned in your resume? Please explain the impact and your role.`,
+    `How do you approach debugging and problem-solving in ${mainTech} development? Can you share a specific example?`,
+    `Write a function to find the first non-repeating character in a string. Explain your approach, time complexity, and space complexity.`
   ];
 }
 
@@ -171,6 +216,36 @@ function authenticateToken(req, res, next) {
 
 // Multer setup for resume uploads
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Test endpoint to list available models
+router.get('/test-models', authenticateToken, async (req, res) => {
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    const models = data.models?.filter(m => 
+      m.supportedGenerationMethods?.includes('generateContent')
+    ).map(m => ({
+      name: m.name,
+      displayName: m.displayName,
+      version: m.version,
+      supportedMethods: m.supportedGenerationMethods
+    }));
+    
+    res.json({
+      success: true,
+      availableModels: models,
+      allModelsCount: data.models?.length || 0,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
 
 // Resume upload & parsing
 router.post('/upload-resume', upload.single('resume'), async (req, res) => {
@@ -571,19 +646,21 @@ router.post('/start-interview', authenticateToken, async (req, res) => {
       });
     }
 
+    // Enhanced prompt for better questions
     const prompt = `You are an expert technical interviewer. Based on the following resume, generate exactly 5 interview questions.
 
-CRITICAL: 
-- Questions must be SPECIFIC to the candidate's skills and experience
+CRITICAL REQUIREMENTS:
+- Questions must be SPECIFIC to the candidate's skills, technologies, and experience mentioned in the resume
 - Make questions challenging and thought-provoking
 - The 5th question MUST be a coding/algorithm question
 - Output ONLY the questions, numbered 1-5
-- No introductory text or explanations
+- No introductory text, explanations, or formatting
+- Each question should be 1-2 sentences
 
-RESUME:
+RESUME CONTENT:
 ${resumeText.substring(0, 2500)}
 
-Generate 5 personalized interview questions:`;
+Generate 5 personalized interview questions based on this specific resume:`;
 
     logWithTimestamp("🎯 Sending request to Gemini API...");
     
@@ -596,10 +673,10 @@ Generate 5 personalized interview questions:`;
       logWithTimestamp(rawResponse);
       logWithTimestamp("=".repeat(50));
       
-      // Parse questions
+      // Parse questions with multiple methods
       let questions = [];
       
-      // Method 1: Split by numbers
+      // Method 1: Split by numbers (1., 2., etc)
       const lines = rawResponse.split('\n');
       for (const line of lines) {
         const match = line.match(/^\d+\.\s*(.+)$/);
@@ -608,7 +685,7 @@ Generate 5 personalized interview questions:`;
         }
       }
       
-      // Method 2: If not enough, try alternative parsing
+      // Method 2: If not enough, try regex pattern
       if (questions.length < 5) {
         const numberMatches = rawResponse.match(/\d+\.\s*([^\n]+)/g);
         if (numberMatches) {
@@ -627,18 +704,29 @@ Generate 5 personalized interview questions:`;
         }
       }
       
+      // Method 4: Clean up any markdown or formatting
+      questions = questions.map(q => q.replace(/\*\*/g, '').replace(/`/g, '').trim());
+      
       // Ensure we have exactly 5 questions
       if (questions.length !== 5) {
         logWithTimestamp(`⚠️ Expected 5 questions, got ${questions.length}. Using fallback.`);
         questions = generateResumeBasedQuestions(resumeText);
       }
       
-      // Clean up questions
-      questions = questions.slice(0, 5).map(q => q.trim());
+      // Clean up and validate questions
+      questions = questions.slice(0, 5).map(q => {
+        // Remove any remaining numbering
+        q = q.replace(/^\d+\.\s*/, '');
+        // Ensure question ends with question mark
+        if (!q.endsWith('?') && !q.endsWith('."') && !q.endsWith('?"')) {
+          q = q + '?';
+        }
+        return q;
+      });
       
       logWithTimestamp(`✅ Generated ${questions.length} questions`);
       questions.forEach((q, i) => {
-        logWithTimestamp(`   ${i + 1}. ${q.substring(0, 100)}`);
+        logWithTimestamp(`   ${i + 1}. ${q.substring(0, 100)}${q.length > 100 ? '...' : ''}`);
       });
       
       // Send response with debug info
@@ -649,12 +737,14 @@ Generate 5 personalized interview questions:`;
           geminiResponse: rawResponse,
           parsedCount: questions.length,
           timestamp: new Date().toISOString(),
-          apiKeyPresent: !!process.env.GEMINI_API_KEY
+          apiKeyPresent: !!process.env.GEMINI_API_KEY,
+          modelUsed: 'gemini-pro (fallback enabled)'
         }
       });
       
     } catch (error) {
       logWithTimestamp(`❌ AI generation error:`, error.message);
+      logWithTimestamp(`Error stack:`, error.stack);
       
       // Send fallback questions with error info
       const fallbackQuestions = generateResumeBasedQuestions(resumeText);
@@ -665,7 +755,8 @@ Generate 5 personalized interview questions:`;
           success: false,
           error: error.message,
           fallback: true,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          apiKeyPresent: !!process.env.GEMINI_API_KEY
         }
       });
     }
