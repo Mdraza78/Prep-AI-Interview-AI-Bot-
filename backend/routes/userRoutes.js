@@ -11,15 +11,58 @@ const pdfParse = require('pdf-parse');
 const router = express.Router();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
+// Helper function with retry logic and exponential backoff
+async function callGeminiAPIWithRetry(prompt, maxRetries = 3, baseDelay = 2000) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const requestBody = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: 200,
+          temperature: 0.7,
+          topP: 0.9
+        }
+      };
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (response.status === 429) {
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        console.log(`⚠️ Rate limit hit. Retry ${attempt}/${maxRetries} after ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+      
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      console.log(`Attempt ${attempt} failed: ${error.message}, retrying...`);
+      await new Promise(resolve => setTimeout(resolve, baseDelay));
+    }
+  }
+}
+
 async function generateInterviewQuestion(prompt) {
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
     const body = {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         maxOutputTokens: 200,
-        temperature: 0.8, // Slightly higher for more variation
+        temperature: 0.8,
         topP: 0.9
       }
     };
@@ -27,8 +70,7 @@ async function generateInterviewQuestion(prompt) {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 
-        'Content-Type': 'application/json',
-        'x-goog-api-key': GEMINI_API_KEY 
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(body),
       timeout: 15000
@@ -38,9 +80,10 @@ async function generateInterviewQuestion(prompt) {
       const errorData = await response.json();
       console.error(`Gemini API error: ${response.status}`, errorData);
       
-      // Specific error handling
       if (response.status === 429) {
-        throw new Error('Rate limit exceeded. Please try again in a moment.');
+        console.log('Rate limit hit, waiting 3 seconds...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        return generateInterviewQuestion(prompt); // Retry once
       } else if (response.status === 400) {
         throw new Error('Invalid request to AI service.');
       } else {
@@ -58,7 +101,7 @@ async function generateInterviewQuestion(prompt) {
     return data.candidates[0].content.parts[0].text.trim();
   } catch (error) {
     console.error('Error in generateInterviewQuestion:', error.message);
-    throw error; // Re-throw to be handled by caller
+    throw error;
   }
 }
 
@@ -184,7 +227,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Evaluate test route - AI powered (UPDATED VERSION)
+// Evaluate test route - AI powered with rate limit handling
 router.post('/evaluate-test', authenticateToken, async (req, res) => {
   try {
     const { resumeText, questions, answers } = req.body;
@@ -192,7 +235,6 @@ router.post('/evaluate-test', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Missing data." });
     }
 
-    // Validate arrays have same length
     if (questions.length !== answers.length) {
       return res.status(400).json({ error: "Questions and answers count mismatch" });
     }
@@ -201,7 +243,6 @@ router.post('/evaluate-test', authenticateToken, async (req, res) => {
     let details = [];
     const userId = req.user.userId;
 
-    // Check if Gemini API key exists
     if (!process.env.GEMINI_API_KEY) {
       console.error("❌ GEMINI_API_KEY is missing in environment variables");
       return res.status(500).json({ error: "AI evaluation service is not configured" });
@@ -212,12 +253,11 @@ router.post('/evaluate-test', authenticateToken, async (req, res) => {
       const question = questions[i];
       const answer = answers[i] || "No answer given";
 
-      // Improved prompt for better evaluation
       const prompt = `
 You are an experienced technical interviewer. Evaluate this interview answer.
 
 CANDIDATE'S RESUME CONTEXT:
-${resumeText.substring(0, 2000)}  // Limit context size
+${resumeText.substring(0, 2000)}
 
 INTERVIEW QUESTION ${i + 1}:
 ${question}
@@ -227,27 +267,23 @@ ${answer}
 
 INSTRUCTIONS:
 1. Score this answer from 0 to 20 based on:
-   - Technical correctness (if technical question)
+   - Technical correctness
    - Relevance to their resume experience
-   - Clarity and completeness of explanation
+   - Clarity and completeness
    - Demonstration of skills mentioned in resume
-   - Problem-solving approach
 
 2. First line must be ONLY the numeric score (e.g., "15")
 
-3. Second line must be constructive feedback (2-3 sentences):
-   - What was good about the answer
-   - What could be improved
-   - How it relates to their resume
+3. Second line must be constructive feedback (2-3 sentences)
 
 EXAMPLE FORMAT:
 14
-Good explanation of concepts, but could provide more specific examples from your resume. Consider mentioning your experience with React.js when discussing frontend architecture.
+Good explanation of concepts, but could provide more specific examples from your resume.
 
 Now evaluate this answer:
 `;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
       
       const requestBody = {
         contents: [{ 
@@ -257,60 +293,60 @@ Now evaluate this answer:
           maxOutputTokens: 200,
           temperature: 0.3,
           topP: 0.8
-        },
-        safetySettings: [
-          {
-            category: "HARM_CATEGORY_HARASSMENT",
-            threshold: "BLOCK_NONE"
-          }
-        ]
+        }
       };
 
       console.log(`📊 Evaluating question ${i + 1}/${questions.length}`);
-      console.log(`Question: ${question.substring(0, 100)}...`);
 
       let aiText = "";
-      let numericScore = 10; // Default score
+      let numericScore = 10;
       let feedback = "No specific feedback available at this time.";
 
-      try {
-        const aiRes = await fetch(url, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(requestBody)
-        });
+      let retryCount = 0;
+      const maxRetries = 2;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          const aiRes = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody)
+          });
 
-        console.log(`🔍 API Response Status: ${aiRes.status}`);
+          console.log(`🔍 API Response Status: ${aiRes.status}`);
 
-        if (!aiRes.ok) {
-          const errorText = await aiRes.text();
-          console.error(`❌ API Error ${aiRes.status}:`, errorText.substring(0, 200));
-          
-          // More specific fallback based on error
           if (aiRes.status === 429) {
-            feedback = "Rate limit reached. Using default evaluation.";
-          } else if (aiRes.status === 400) {
-            feedback = "AI service configuration issue.";
-          } else {
-            feedback = "AI evaluation service temporarily unavailable.";
+            retryCount++;
+            if (retryCount <= maxRetries) {
+              const waitTime = 3000 * retryCount;
+              console.log(`⚠️ Rate limit hit. Retry ${retryCount}/${maxRetries} after ${waitTime}ms...`);
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+              continue;
+            } else {
+              feedback = "Rate limit reached. Please try again later.";
+              break;
+            }
           }
-        } else {
+
+          if (!aiRes.ok) {
+            const errorText = await aiRes.text();
+            console.error(`❌ API Error ${aiRes.status}:`, errorText.substring(0, 200));
+            feedback = "AI evaluation service temporarily unavailable.";
+            break;
+          }
+
           const aiData = await aiRes.json();
           console.log("✅ AI Response received");
           
-          // Parse AI response
           if (aiData.candidates && aiData.candidates[0] && aiData.candidates[0].content) {
             aiText = aiData.candidates[0].content.parts[0].text || "";
-            console.log(`AI Response text (first 200 chars): ${aiText.substring(0, 200)}...`);
+            console.log(`AI Response: ${aiText.substring(0, 200)}...`);
           }
           
           if (aiText.trim()) {
             aiText = aiText.trim();
             const lines = aiText.split('\n').filter(line => line.trim());
             
-            // Try to extract score from first line
             if (lines.length > 0) {
               const firstLine = lines[0].trim();
               const scoreMatch = firstLine.match(/\b(\d{1,2}|20)\b/);
@@ -320,21 +356,23 @@ Now evaluate this answer:
                 console.log(`✅ Extracted score: ${numericScore}`);
               }
               
-              // Combine remaining lines for feedback
               if (lines.length > 1) {
                 feedback = lines.slice(1).join(' ').trim();
               } else {
-                feedback = "Good answer. Try to provide more specific examples from your experience.";
+                feedback = "Good answer. Try to provide more specific examples.";
               }
             }
           } else {
             console.warn("Empty AI response");
             feedback = "AI evaluation did not return specific feedback.";
           }
+          break;
+          
+        } catch (fetchError) {
+          console.error(`❌ Fetch error for question ${i + 1}:`, fetchError.message);
+          feedback = "Network error during evaluation. Please try again.";
+          break;
         }
-      } catch (fetchError) {
-        console.error(`❌ Fetch error for question ${i + 1}:`, fetchError.message);
-        feedback = "Network error during evaluation. Please try again.";
       }
 
       totalScore += numericScore;
@@ -348,9 +386,10 @@ Now evaluate this answer:
 
       console.log(`📝 Question ${i + 1} evaluation: Score ${numericScore}/20`);
       
-      // Add delay between API calls to avoid rate limiting
+      // Increased delay between API calls to avoid rate limiting
       if (i < questions.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Increased delay
+        console.log(`⏱️ Waiting 3 seconds before next evaluation...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }
 
@@ -367,7 +406,6 @@ Now evaluate this answer:
       console.log(`✅ Test result saved for user ${userId}, total score: ${totalScore}/100`);
     } catch (dbError) {
       console.error("❌ Database save error:", dbError.message);
-      // Continue even if DB save fails
     }
 
     res.json({ 
@@ -496,7 +534,6 @@ router.post('/start-interview', authenticateToken, async (req, res) => {
     const { resumeText } = req.body;
     if (!resumeText) return res.status(400).json({ error: "Resume text required" });
 
-    // Improved keyword extraction
     const extractKeywords = (text) => {
       const commonWords = new Set([
         'the', 'and', 'for', 'with', 'from', 'this', 'that', 'have', 'was', 'were',
@@ -536,34 +573,25 @@ router.post('/start-interview', authenticateToken, async (req, res) => {
     const questionPrompts = [
       `Based on this resume: "${resumeText.substring(0, 1000)}"
 Generate ONE specific technical interview question about ${mainTech} that tests deep understanding.
-Make it challenging but fair for someone with the experience shown in the resume.
-Question should be specific to ${mainTech} concepts or implementation.
+Make it challenging but fair.
 Return ONLY the question text.`,
 
       `Based on this resume: "${resumeText.substring(0, 1000)}"
 Generate ONE behavioral interview question asking about their experience with ${secondaryTech}.
-The question should ask them to describe a specific project or situation.
-Make it relevant to the technologies mentioned in the resume.
+The question should ask them to describe a specific project.
 Return ONLY the question text.`,
 
       `Based on this resume: "${resumeText.substring(0, 1000)}"
 Generate ONE scenario-based problem-solving question related to ${mainTech}.
-The question should present a realistic work challenge they might face.
-Make it specific to their field/technology mentioned in resume.
+The question should present a realistic work challenge.
 Return ONLY the question text.`,
 
       `Based on this resume: "${resumeText.substring(0, 1000)}"
 Generate ONE system design or architecture question relevant to ${mainTech}.
-The question should test their ability to design solutions at scale.
-Make it appropriate for their experience level.
 Return ONLY the question text.`,
 
       `Based on this resume: "${resumeText.substring(0, 1000)}"
 Generate ONE specific coding/programming question for ${mainTech}.
-The question should require writing actual code or pseudocode.
-Make it appropriate for an intermediate-level developer.
-Include specific requirements or constraints.
-Example format: "Write a function that..." or "Implement a solution for..."
 Return ONLY the question text.`
     ];
 
@@ -581,14 +609,16 @@ Return ONLY the question text.`
             .replace(/^Question\s*\d*[.:]\s*/i, '');
           
           questions.push(cleanQuestion);
-          console.log(`✅ Question ${i + 1} generated: ${cleanQuestion.substring(0, 80)}...`);
+          console.log(`✅ Question ${i + 1} generated`);
         } else {
           console.warn(`⚠️ Question ${i + 1} too short, using fallback`);
           questions.push(getResumeSpecificFallback(i, keywords, resumeText));
         }
         
+        // Increased delay between questions
         if (i < questionPrompts.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2500));
+          console.log(`⏱️ Waiting 3 seconds before next question...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
         }
       } catch (error) {
         console.error(`❌ Error generating question ${i + 1}:`, error.message);
@@ -600,35 +630,34 @@ Return ONLY the question text.`
       questions.push(getResumeSpecificFallback(questions.length, keywords, resumeText));
     }
 
-    console.log("✅ All questions generated");
+    console.log("✅ All 5 questions generated successfully");
     res.json({ questions });
 
   } catch (err) {
     console.error('❌ Interview Generation Error:', err);
     
     const fallbackQuestions = [
-      "Based on your resume, walk me through your most challenging technical project. What specific technologies did you use and what problems did you solve?",
-      "Describe a situation where you had to learn a new technology quickly for a project. How did you approach it and what was the outcome?",
-      "How do you ensure code quality and maintainability in your projects? Give examples from your experience.",
-      "Tell me about a time you had to debug a complex issue. What was your systematic approach to finding and fixing it?",
-      "Write a function that demonstrates your understanding of core programming concepts. Explain your approach and time complexity."
+      "Based on your resume, walk me through your most challenging technical project. What specific technologies did you use?",
+      "Describe a situation where you had to learn a new technology quickly for a project.",
+      "How do you ensure code quality and maintainability in your projects?",
+      "Tell me about a time you had to debug a complex issue.",
+      "Write a function that demonstrates your understanding of core programming concepts."
     ];
     
     res.json({ questions: fallbackQuestions });
   }
 });
 
-// Helper function for fallback questions
 function getResumeSpecificFallback(index, keywords, resumeText) {
   const mainTech = keywords[0] || 'your primary technology';
   const secondaryTech = keywords[1] || 'key skills';
   
   const fallbacks = [
     `What experience do you have with ${mainTech}? Can you give specific examples from projects mentioned in your resume?`,
-    `Describe a project where you used ${secondaryTech} to solve a real-world problem. What was your role and what challenges did you face?`,
-    `How would you approach optimizing a ${mainTech} application for better performance? What metrics would you track?`,
-    `Tell me about a time you had to collaborate with a team on a technical project. What was your contribution and what did you learn?`,
-    `Write a solution for: Given a problem related to ${mainTech}, how would you implement it? Consider edge cases and efficiency.`
+    `Describe a project where you used ${secondaryTech} to solve a real-world problem. What was your role?`,
+    `How would you approach optimizing a ${mainTech} application for better performance?`,
+    `Tell me about a time you had to collaborate with a team on a technical project.`,
+    `Write a solution for a problem related to ${mainTech}. Explain your approach.`
   ];
   
   return fallbacks[index % fallbacks.length];

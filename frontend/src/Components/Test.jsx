@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Bot, Mic, MicOff, Volume2, ChevronLeft, User, CheckCircle, XCircle } from "lucide-react";
+import { Bot, Mic, MicOff, Volume2, ChevronLeft, User, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { API_URLS } from "../config/api";
 
 const BORDER_COLOR = "#10b981";
 
-// Animation helper
 const fadeSlideInStyle = (delay) => ({
   animationName: "fadeSlideIn",
   animationDuration: "0.7s",
@@ -24,7 +23,6 @@ function QuestionDisplay({ question }) {
   let key = 0;
 
   while ((match = codeBlockRegex.exec(question)) !== null) {
-    // Add text before code block
     if (match.index > lastIndex) {
       const text = question.slice(lastIndex, match.index);
       if (text.trim()) {
@@ -39,7 +37,6 @@ function QuestionDisplay({ question }) {
       }
     }
 
-    // Add code block
     const codeContent = match[1].replace(/```/g, '').trim();
     parts.push(
       <div
@@ -57,7 +54,6 @@ function QuestionDisplay({ question }) {
     lastIndex = match.index + match[0].length;
   }
 
-  // Add remaining text
   if (lastIndex < question.length) {
     const text = question.slice(lastIndex);
     if (text.trim()) {
@@ -96,6 +92,7 @@ export default function Test() {
   const [recognitionSupported, setRecognitionSupported] = useState(false);
   const [error, setError] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [retryMessage, setRetryMessage] = useState("");
 
   const userName = localStorage.getItem("name") || "User";
   const navigate = useNavigate();
@@ -103,9 +100,7 @@ export default function Test() {
   const speechSynthesisRef = useRef(null);
 
   useEffect(() => {
-    // Initialize speech recognition
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       setRecognitionSupported(true);
       const recognition = new SpeechRecognition();
@@ -114,7 +109,6 @@ export default function Test() {
       recognition.lang = "en-US";
 
       recognition.onstart = () => setIsRecording(true);
-
       recognition.onresult = (event) => {
         let transcript = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -122,28 +116,21 @@ export default function Test() {
         }
         setAnswerInput(transcript.trim());
       };
-
       recognition.onerror = (event) => {
         setIsRecording(false);
         console.error("Speech recognition error:", event.error);
         if (event.error === "not-allowed") {
           alert("Microphone access denied. Please allow microphone permission.");
-        } else if (event.error === "network") {
-          alert("Network error. Please check your connection.");
         }
       };
-
       recognition.onend = () => setIsRecording(false);
-
       recognitionRef.current = recognition;
     }
 
-    // Initialize speech synthesis
     if ("speechSynthesis" in window) {
       speechSynthesisRef.current = window.speechSynthesis;
     }
 
-    // Fetch questions
     async function fetchQuestions() {
       setIsLoadingQuestions(true);
       setError(null);
@@ -179,7 +166,6 @@ export default function Test() {
           setQuestions(data.questions);
           setAnswers(Array(data.questions.length).fill(""));
           setAnswerInput("");
-          // Speak the first question after a short delay
           setTimeout(() => {
             speakText(data.questions[0]);
           }, 500);
@@ -236,7 +222,6 @@ export default function Test() {
       setAnswerInput("");
       recognitionRef.current.start();
 
-      // Set timeout to stop recording after 30 seconds
       setTimeout(() => {
         if (recognitionRef.current && isRecording) {
           recognitionRef.current.stop();
@@ -249,8 +234,6 @@ export default function Test() {
         alert("Microphone access denied. Please allow microphone permission.");
       } else if (err.name === "NotFoundError") {
         alert("No microphone found on your device.");
-      } else {
-        alert("Error accessing microphone. Please try again.");
       }
     }
   };
@@ -311,40 +294,58 @@ export default function Test() {
     setAnswers(temp);
     setIsSubmitting(true);
     setError(null);
+    setRetryMessage("");
     
-    try {
-      const resumeText = localStorage.getItem("resumeText");
-      const res = await fetch(API_URLS.EVALUATE_TEST, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          resumeText,
-          questions,
-          answers: temp,
-        }),
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Evaluation failed");
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    const submitEvaluation = async () => {
+      try {
+        const resumeText = localStorage.getItem("resumeText");
+        const res = await fetch(API_URLS.EVALUATE_TEST, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            resumeText,
+            questions,
+            answers: temp,
+          }),
+        });
+        
+        // Handle rate limiting with retry
+        if (res.status === 429 && retryCount < maxRetries) {
+          retryCount++;
+          const delay = 4000 * retryCount;
+          setRetryMessage(`⚠️ Rate limit reached. Retrying in ${delay/1000} seconds... (Attempt ${retryCount}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return submitEvaluation();
+        }
+        
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || "Evaluation failed");
+        }
+        
+        const data = await res.json();
+        setScore(data.score);
+        setResultDetails(data.details || []);
+        setShowFeedback(true);
+        setError(null);
+        setRetryMessage("");
+      } catch (err) {
+        console.error("Error submitting test:", err);
+        setError(err.message || "Error submitting test. Please try again.");
+        setIsSubmitting(false);
       }
-      
-      const data = await res.json();
-      setScore(data.score);
-      setResultDetails(data.details || []);
-      setShowFeedback(true);
-    } catch (err) {
-      console.error("Error submitting test:", err);
-      setError(err.message || "Error submitting test. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    };
+    
+    await submitEvaluation();
+    setIsSubmitting(false);
   };
 
-  // If showing results with feedback
   if (score !== null && showFeedback) {
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -355,14 +356,12 @@ export default function Test() {
           }
         `}</style>
 
-        {/* Header */}
         <header className="w-full bg-gray-800/80 backdrop-blur-sm border-b border-gray-700 shadow-lg sticky top-0 z-50">
           <div className="flex items-center justify-between max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => navigate("/dashboard")}
                 className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors duration-200"
-                aria-label="Back to Dashboard"
               >
                 <ChevronLeft size={20} className="text-white" />
               </button>
@@ -386,7 +385,6 @@ export default function Test() {
           </div>
         </header>
 
-        {/* Main Content */}
         <main className="flex-1 w-full py-6 px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto">
             <div className="text-center py-8" style={fadeSlideInStyle("0.1s")}>
@@ -394,9 +392,7 @@ export default function Test() {
                 <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
                   <CheckCircle size={40} className="text-white" />
                 </div>
-                <h2 className="text-3xl font-bold text-white mb-4">
-                  Interview Complete!
-                </h2>
+                <h2 className="text-3xl font-bold text-white mb-4">Interview Complete!</h2>
                 <div className="text-gray-300 mb-2">Your Overall Score</div>
                 <div className="text-5xl font-bold text-emerald-400 mb-8">
                   {score}<span className="text-2xl text-gray-400">/100</span>
@@ -404,7 +400,6 @@ export default function Test() {
               </div>
             </div>
 
-            {/* Detailed Feedback Section */}
             <div className="mt-8" style={fadeSlideInStyle("0.3s")}>
               <h3 className="text-2xl font-bold text-white mb-6 text-center">Detailed Feedback</h3>
               <div className="space-y-6">
@@ -412,19 +407,13 @@ export default function Test() {
                   <div
                     key={idx}
                     style={fadeSlideInStyle(`${0.4 + idx * 0.1}s`)}
-                    className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 overflow-hidden hover:border-emerald-500/50 transition-all duration-300"
+                    className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 overflow-hidden"
                   >
                     <div className="bg-gray-900 px-6 py-4 border-b border-gray-700">
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                        <h4 className="text-lg font-semibold text-emerald-400">
-                          Question {idx + 1}
-                        </h4>
-                        <div className="flex items-center gap-2">
-                          <div className="bg-emerald-600/20 px-3 py-1 rounded-full">
-                            <span className="text-emerald-400 font-bold">
-                              Score: {detail.individualScore}/20
-                            </span>
-                          </div>
+                        <h4 className="text-lg font-semibold text-emerald-400">Question {idx + 1}</h4>
+                        <div className="bg-emerald-600/20 px-3 py-1 rounded-full">
+                          <span className="text-emerald-400 font-bold">Score: {detail.individualScore}/20</span>
                         </div>
                       </div>
                     </div>
@@ -446,9 +435,7 @@ export default function Test() {
                         <div>
                           <p className="text-gray-400 text-sm font-medium mb-2">AI Feedback:</p>
                           <div className="bg-amber-600/10 border border-amber-600/30 rounded-lg p-4">
-                            <p className="text-amber-400 text-base leading-relaxed">
-                              {detail.feedback}
-                            </p>
+                            <p className="text-amber-400 text-base leading-relaxed">{detail.feedback}</p>
                           </div>
                         </div>
                       )}
@@ -458,11 +445,10 @@ export default function Test() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="mt-8 text-center" style={fadeSlideInStyle("0.8s")}>
               <button
                 onClick={() => navigate("/dashboard")}
-                className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
+                className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-all duration-300"
               >
                 Return to Dashboard
               </button>
@@ -470,7 +456,6 @@ export default function Test() {
           </div>
         </main>
 
-        {/* Footer */}
         <footer className="bg-gray-800/80 backdrop-blur-sm border-t border-gray-700 py-6">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center text-gray-400">
@@ -485,27 +470,19 @@ export default function Test() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      {/* Animations */}
       <style>{`
         @keyframes fadeSlideIn {
           0% { opacity: 0; transform: translateY(1rem); }
           100% { opacity: 1; transform: translateY(0); }
         }
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 12px 3px ${BORDER_COLOR}88; }
-          50% { box-shadow: 0 0 20px 5px ${BORDER_COLOR}cc; }
-        }
-        .animate-progress-pulse { animation: pulse-glow 2.5s infinite ease-in-out; }
       `}</style>
 
-      {/* Professional Header */}
       <header className="w-full bg-gray-800/80 backdrop-blur-sm border-b border-gray-700 shadow-lg sticky top-0 z-50">
         <div className="flex items-center justify-between max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center space-x-4">
             <button
               onClick={() => navigate("/dashboard")}
               className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors duration-200"
-              aria-label="Back to Dashboard"
             >
               <ChevronLeft size={20} className="text-white" />
             </button>
@@ -527,20 +504,23 @@ export default function Test() {
             </div>
             <div className="flex items-center space-x-2 bg-emerald-600/20 rounded-lg px-3 py-2 border border-emerald-500/30">
               <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-              <span className="text-emerald-400 text-sm font-medium">
-                Q{currentIndex + 1}/5
-              </span>
+              <span className="text-emerald-400 text-sm font-medium">Q{currentIndex + 1}/5</span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 w-full py-6 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
           {error && (
             <div className="mb-4 p-4 bg-red-600/20 border border-red-600 rounded-lg text-red-400 text-center">
               {error}
+            </div>
+          )}
+          
+          {retryMessage && (
+            <div className="mb-4 p-4 bg-yellow-600/20 border border-yellow-600 rounded-lg text-yellow-400 text-center">
+              {retryMessage}
             </div>
           )}
           
@@ -552,9 +532,7 @@ export default function Test() {
             </div>
           ) : questions.length !== 5 ? (
             <div className="text-center py-20">
-              <p className="text-gray-300 text-lg">
-                Expected 5 questions, found {questions.length}.
-              </p>
+              <p className="text-gray-300 text-lg">Expected 5 questions, found {questions.length}.</p>
               <button
                 onClick={() => navigate("/dashboard")}
                 className="mt-4 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
@@ -564,7 +542,6 @@ export default function Test() {
             </div>
           ) : (
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700 shadow-2xl overflow-hidden">
-              {/* Progress Section */}
               <div className="bg-gray-900 px-6 py-4 border-b border-gray-700">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-emerald-400 font-semibold text-sm uppercase tracking-wider">
@@ -572,26 +549,21 @@ export default function Test() {
                   </span>
                   <button
                     onClick={handleReplayQuestion}
-                    className="flex items-center space-x-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors duration-200"
-                    title="Replay Question"
+                    className="flex items-center space-x-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg"
                   >
                     <Volume2 size={16} className="text-white" />
                     <span className="text-white text-sm hidden sm:block">Replay</span>
                   </button>
                 </div>
                 
-                {/* Progress Bar */}
                 <div className="w-full bg-gray-700 rounded-full h-2">
                   <div
-                    className="bg-emerald-500 h-2 rounded-full transition-all duration-500 ease-out"
-                    style={{
-                      width: `${((currentIndex + 1) / questions.length) * 100}%`,
-                    }}
+                    className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
                   ></div>
                 </div>
               </div>
 
-              {/* Question Content */}
               <div className="p-6 sm:p-8">
                 <div className="mb-6">
                   <QuestionDisplay question={questions[currentIndex]} />
@@ -607,7 +579,6 @@ export default function Test() {
                   )}
                 </div>
 
-                {/* Answer Input Section */}
                 <div className="space-y-4">
                   {currentIndex < 4 ? (
                     <>
@@ -615,43 +586,29 @@ export default function Test() {
                         <button
                           onClick={isRecording ? stopRecording : startRecording}
                           disabled={!recognitionSupported}
-                          className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+                          className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all ${
                             isRecording
                               ? "bg-red-500 hover:bg-red-600 text-white animate-pulse"
                               : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                          } ${
-                            !recognitionSupported
-                              ? "opacity-50 cursor-not-allowed"
-                              : ""
-                          }`}
+                          } ${!recognitionSupported ? "opacity-50 cursor-not-allowed" : ""}`}
                         >
-                          {isRecording ? (
-                            <MicOff size={18} className="text-white" />
-                          ) : (
-                            <Mic size={18} className="text-white" />
-                          )}
-                          <span>
-                            {isRecording ? "Stop Recording" : "Answer with Voice"}
-                          </span>
+                          {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+                          <span>{isRecording ? "Stop Recording" : "Answer with Voice"}</span>
                         </button>
                       </div>
                       
                       <textarea
                         readOnly
                         rows={4}
-                        className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-500 transition-colors"
-                        placeholder={
-                          recognitionSupported
-                            ? "Your voice answer will appear here..."
-                            : "Voice input not supported in your browser"
-                        }
+                        className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none"
+                        placeholder="Your voice answer will appear here..."
                         value={answerInput}
                       />
                     </>
                   ) : (
                     <textarea
                       rows={6}
-                      className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-500 transition-colors"
+                      className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-500"
                       placeholder="Type your code solution here..."
                       value={answerInput}
                       onChange={(e) => setAnswerInput(e.target.value)}
@@ -659,11 +616,10 @@ export default function Test() {
                   )}
                 </div>
 
-                {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4 mt-8">
                   <button
                     onClick={handleSkip}
-                    className="px-8 py-3 bg-gray-600 hover:bg-gray-500 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95"
+                    className="px-8 py-3 bg-gray-600 hover:bg-gray-500 text-white font-semibold rounded-lg transition-all"
                   >
                     Skip Question
                   </button>
@@ -672,7 +628,7 @@ export default function Test() {
                     <button
                       onClick={handleNext}
                       disabled={!answerInput.trim()}
-                      className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Next Question
                     </button>
@@ -680,7 +636,7 @@ export default function Test() {
                     <button
                       onClick={handleEndTest}
                       disabled={!answerInput.trim() || isSubmitting}
-                      className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? (
                         <span className="flex items-center space-x-2">
@@ -699,16 +655,11 @@ export default function Test() {
         </div>
       </main>
 
-      {/* Professional Footer */}
       <footer className="bg-gray-800/80 backdrop-blur-sm border-t border-gray-700 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center text-gray-400">
-            <p className="text-sm">
-              © 2025 Prep Mind. All rights reserved.
-            </p>
-            <p className="text-xs mt-1">
-              Made with ❤️ by Md Raza
-            </p>
+            <p className="text-sm">© 2025 Prep Mind. All rights reserved.</p>
+            <p className="text-xs mt-1">Made with ❤️ by Md Raza</p>
           </div>
         </div>
       </footer>
