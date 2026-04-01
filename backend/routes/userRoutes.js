@@ -20,7 +20,7 @@ async function callGeminiAPIWithRetry(prompt, maxRetries = 3, baseDelay = 2000) 
       const requestBody = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          maxOutputTokens: 200,
+          maxOutputTokens: 300,
           temperature: 0.7,
           topP: 0.9
         }
@@ -61,7 +61,7 @@ async function generateInterviewQuestion(prompt) {
     const body = {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
-        maxOutputTokens: 200,
+        maxOutputTokens: 300,
         temperature: 0.8,
         topP: 0.9
       }
@@ -83,7 +83,7 @@ async function generateInterviewQuestion(prompt) {
       if (response.status === 429) {
         console.log('Rate limit hit, waiting 3 seconds...');
         await new Promise(resolve => setTimeout(resolve, 3000));
-        return generateInterviewQuestion(prompt); // Retry once
+        return generateInterviewQuestion(prompt);
       } else if (response.status === 400) {
         throw new Error('Invalid request to AI service.');
       } else {
@@ -95,13 +95,13 @@ async function generateInterviewQuestion(prompt) {
     
     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
       console.warn('Unexpected AI response structure:', data);
-      return "Could you describe your experience relevant to this role?";
+      return null;
     }
     
     return data.candidates[0].content.parts[0].text.trim();
   } catch (error) {
     console.error('Error in generateInterviewQuestion:', error.message);
-    throw error;
+    return null;
   }
 }
 
@@ -253,42 +253,32 @@ router.post('/evaluate-test', authenticateToken, async (req, res) => {
       const question = questions[i];
       const answer = answers[i] || "No answer given";
 
-      const prompt = `
-You are an experienced technical interviewer. Evaluate this interview answer.
+      const prompt = `You are an experienced technical interviewer. Evaluate this interview answer.
 
-CANDIDATE'S RESUME CONTEXT:
-${resumeText.substring(0, 2000)}
+RESUME CONTEXT:
+${resumeText.substring(0, 1500)}
 
-INTERVIEW QUESTION ${i + 1}:
+QUESTION ${i + 1}:
 ${question}
 
 CANDIDATE'S ANSWER:
 ${answer}
 
 INSTRUCTIONS:
-1. Score this answer from 0 to 20 based on:
-   - Technical correctness
-   - Relevance to their resume experience
-   - Clarity and completeness
-   - Demonstration of skills mentioned in resume
+1. Score from 0-20 based on technical accuracy, completeness, and relevance to resume.
+2. First line: ONLY the score (number between 0-20)
+3. Second line: Constructive feedback (2-3 sentences)
 
-2. First line must be ONLY the numeric score (e.g., "15")
+EXAMPLE:
+15
+Good understanding of concepts. Could provide more specific examples from your experience.
 
-3. Second line must be constructive feedback (2-3 sentences)
-
-EXAMPLE FORMAT:
-14
-Good explanation of concepts, but could provide more specific examples from your resume.
-
-Now evaluate this answer:
-`;
+Now evaluate:`;
 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
       
       const requestBody = {
-        contents: [{ 
-          parts: [{ text: prompt }] 
-        }],
+        contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           maxOutputTokens: 200,
           temperature: 0.3,
@@ -298,9 +288,8 @@ Now evaluate this answer:
 
       console.log(`📊 Evaluating question ${i + 1}/${questions.length}`);
 
-      let aiText = "";
       let numericScore = 10;
-      let feedback = "No specific feedback available at this time.";
+      let feedback = "Your answer was received but we couldn't generate detailed feedback. Please try again.";
 
       let retryCount = 0;
       const maxRetries = 2;
@@ -323,7 +312,7 @@ Now evaluate this answer:
               await new Promise(resolve => setTimeout(resolve, waitTime));
               continue;
             } else {
-              feedback = "Rate limit reached. Please try again later.";
+              feedback = "Rate limit reached. Your answer has been saved but evaluation will be processed later.";
               break;
             }
           }
@@ -331,13 +320,14 @@ Now evaluate this answer:
           if (!aiRes.ok) {
             const errorText = await aiRes.text();
             console.error(`❌ API Error ${aiRes.status}:`, errorText.substring(0, 200));
-            feedback = "AI evaluation service temporarily unavailable.";
+            feedback = "Unable to evaluate at this time. Please try again later.";
             break;
           }
 
           const aiData = await aiRes.json();
           console.log("✅ AI Response received");
           
+          let aiText = "";
           if (aiData.candidates && aiData.candidates[0] && aiData.candidates[0].content) {
             aiText = aiData.candidates[0].content.parts[0].text || "";
             console.log(`AI Response: ${aiText.substring(0, 200)}...`);
@@ -349,7 +339,7 @@ Now evaluate this answer:
             
             if (lines.length > 0) {
               const firstLine = lines[0].trim();
-              const scoreMatch = firstLine.match(/\b(\d{1,2}|20)\b/);
+              const scoreMatch = firstLine.match(/\b(\d{1,2})\b/);
               if (scoreMatch) {
                 numericScore = parseInt(scoreMatch[1], 10);
                 numericScore = Math.min(Math.max(numericScore, 0), 20);
@@ -359,18 +349,15 @@ Now evaluate this answer:
               if (lines.length > 1) {
                 feedback = lines.slice(1).join(' ').trim();
               } else {
-                feedback = "Good answer. Try to provide more specific examples.";
+                feedback = "Good effort! Try to provide more specific details from your experience.";
               }
             }
-          } else {
-            console.warn("Empty AI response");
-            feedback = "AI evaluation did not return specific feedback.";
           }
           break;
           
         } catch (fetchError) {
           console.error(`❌ Fetch error for question ${i + 1}:`, fetchError.message);
-          feedback = "Network error during evaluation. Please try again.";
+          feedback = "Network issue. Your answer has been saved.";
           break;
         }
       }
@@ -381,12 +368,12 @@ Now evaluate this answer:
         question: question,
         answer: answer,
         individualScore: numericScore,
-        feedback: feedback || "Feedback not available."
+        feedback: feedback
       });
 
       console.log(`📝 Question ${i + 1} evaluation: Score ${numericScore}/20`);
       
-      // Increased delay between API calls to avoid rate limiting
+      // Delay between API calls
       if (i < questions.length - 1) {
         console.log(`⏱️ Waiting 3 seconds before next evaluation...`);
         await new Promise(resolve => setTimeout(resolve, 3000));
@@ -528,72 +515,107 @@ router.patch('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Start interview - generate questions
+// Start interview - generate questions based on resume
 router.post('/start-interview', authenticateToken, async (req, res) => {
   try {
     const { resumeText } = req.body;
     if (!resumeText) return res.status(400).json({ error: "Resume text required" });
 
-    const extractKeywords = (text) => {
-      const commonWords = new Set([
-        'the', 'and', 'for', 'with', 'from', 'this', 'that', 'have', 'was', 'were',
-        'been', 'are', 'has', 'had', 'will', 'would', 'should', 'could', 'about',
-        'they', 'their', 'there', 'what', 'which', 'when', 'where', 'who', 'how',
-        'your', 'you', 'our', 'can', 'more', 'very', 'just', 'also', 'than', 'then'
-      ]);
+    // Analyze resume to determine primary skill focus
+    const analyzeResumeFocus = (text) => {
+      const lowerText = text.toLowerCase();
       
-      const techKeywords = [
-        'javascript', 'react', 'node', 'python', 'java', 'sql', 'mongodb', 'express',
-        'html', 'css', 'typescript', 'aws', 'docker', 'kubernetes', 'git', 'github',
-        'api', 'rest', 'graphql', 'agile', 'scrum', 'testing', 'debugging', 'deployment'
-      ];
+      // Check for data-related keywords
+      const dataKeywords = ['sql', 'python', 'pandas', 'power bi', 'excel', 'data analysis', 'data analyst', 'analytics', 'data cleaning', 'dashboard'];
+      // Check for development-related keywords
+      const devKeywords = ['react', 'node.js', 'express', 'mongodb', 'mern', 'full stack', 'frontend', 'backend', 'api', 'development'];
       
-      const words = text.toLowerCase().split(/[\s.,;:!?()\[\]{}]+/);
-      const wordFreq = {};
+      let dataScore = 0;
+      let devScore = 0;
       
-      words.forEach(word => {
-        if (word.length > 2 && !commonWords.has(word)) {
-          const weight = techKeywords.includes(word) ? 3 : 1;
-          wordFreq[word] = (wordFreq[word] || 0) + weight;
-        }
+      dataKeywords.forEach(keyword => {
+        if (lowerText.includes(keyword)) dataScore += 2;
       });
       
-      return Object.entries(wordFreq)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 15)
-        .map(entry => entry[0]);
+      devKeywords.forEach(keyword => {
+        if (lowerText.includes(keyword)) devScore += 2;
+      });
+      
+      // Check projects section for more context
+      if (lowerText.includes('sales & revenue analysis')) dataScore += 3;
+      if (lowerText.includes('prep mind')) devScore += 3;
+      if (lowerText.includes('lms')) devScore += 2;
+      
+      console.log(`Resume analysis - Data Score: ${dataScore}, Dev Score: ${devScore}`);
+      
+      if (dataScore >= devScore) {
+        return { primary: 'data', secondary: 'development', mainTech: 'Data Analysis', skills: ['SQL', 'Python', 'Power BI'] };
+      } else {
+        return { primary: 'development', secondary: 'data', mainTech: 'Web Development', skills: ['React', 'Node.js', 'MongoDB'] };
+      }
     };
+    
+    const focus = analyzeResumeFocus(resumeText);
+    console.log(`🎯 Detected primary focus: ${focus.primary.toUpperCase()}`);
 
-    const keywords = extractKeywords(resumeText);
-    console.log("🔍 Extracted keywords:", keywords);
-
-    const mainTech = keywords[0] || 'software development';
-    const secondaryTech = keywords[1] || 'technical projects';
-
-    const questionPrompts = [
-      `Based on this resume: "${resumeText.substring(0, 1000)}"
-Generate ONE specific technical interview question about ${mainTech} that tests deep understanding.
-Make it challenging but fair.
+    // Generate questions based on primary focus
+    let questionPrompts = [];
+    
+    if (focus.primary === 'data') {
+      questionPrompts = [
+        `Based on this resume: "${resumeText.substring(0, 1000)}"
+Generate ONE technical interview question about Data Analysis/SQL. Focus on SQL queries, data cleaning, or analytics.
+The candidate has skills in: SQL, Python, Pandas, Power BI.
 Return ONLY the question text.`,
 
-      `Based on this resume: "${resumeText.substring(0, 1000)}"
-Generate ONE behavioral interview question asking about their experience with ${secondaryTech}.
-The question should ask them to describe a specific project.
+        `Based on this resume: "${resumeText.substring(0, 1000)}"
+Generate ONE behavioral question about a data analysis project they worked on.
+Ask about their approach to solving data problems.
 Return ONLY the question text.`,
 
-      `Based on this resume: "${resumeText.substring(0, 1000)}"
-Generate ONE scenario-based problem-solving question related to ${mainTech}.
-The question should present a realistic work challenge.
+        `Based on this resume: "${resumeText.substring(0, 1000)}"
+Generate ONE scenario question about handling messy data or creating dashboards.
+Make it relevant to their Sales & Revenue Analysis project.
 Return ONLY the question text.`,
 
-      `Based on this resume: "${resumeText.substring(0, 1000)}"
-Generate ONE system design or architecture question relevant to ${mainTech}.
+        `Based on this resume: "${resumeText.substring(0, 1000)}"
+Generate ONE question about their experience with Python/Pandas for data analysis.
+Ask about specific libraries or techniques they used.
 Return ONLY the question text.`,
 
-      `Based on this resume: "${resumeText.substring(0, 1000)}"
-Generate ONE specific coding/programming question for ${mainTech}.
+        `Based on this resume: "${resumeText.substring(0, 1000)}"
+Generate ONE coding question about writing a SQL query or Python function for data analysis.
+Make it practical and relevant to their experience.
 Return ONLY the question text.`
-    ];
+      ];
+    } else {
+      questionPrompts = [
+        `Based on this resume: "${resumeText.substring(0, 1000)}"
+Generate ONE technical interview question about MERN stack development.
+The candidate has built projects with React, Node.js, MongoDB.
+Return ONLY the question text.`,
+
+        `Based on this resume: "${resumeText.substring(0, 1000)}"
+Generate ONE behavioral question about a full-stack project they built.
+Ask about challenges faced and solutions implemented.
+Return ONLY the question text.`,
+
+        `Based on this resume: "${resumeText.substring(0, 1000)}"
+Generate ONE scenario question about building a feature for a web application.
+Make it relevant to their Prep Mind or LMS project experience.
+Return ONLY the question text.`,
+
+        `Based on this resume: "${resumeText.substring(0, 1000)}"
+Generate ONE question about their experience with React and state management.
+Ask about specific components or patterns they used.
+Return ONLY the question text.`,
+
+        `Based on this resume: "${resumeText.substring(0, 1000)}"
+Generate ONE coding question about implementing a feature in React or Node.js.
+Make it practical and relevant to their experience level.
+Return ONLY the question text.`
+      ];
+    }
 
     const questions = [];
     
@@ -611,23 +633,22 @@ Return ONLY the question text.`
           questions.push(cleanQuestion);
           console.log(`✅ Question ${i + 1} generated`);
         } else {
-          console.warn(`⚠️ Question ${i + 1} too short, using fallback`);
-          questions.push(getResumeSpecificFallback(i, keywords, resumeText));
+          console.warn(`⚠️ Question ${i + 1} generation failed, using fallback`);
+          questions.push(getFallbackQuestion(i, focus));
         }
         
-        // Increased delay between questions
         if (i < questionPrompts.length - 1) {
           console.log(`⏱️ Waiting 3 seconds before next question...`);
           await new Promise(resolve => setTimeout(resolve, 3000));
         }
       } catch (error) {
         console.error(`❌ Error generating question ${i + 1}:`, error.message);
-        questions.push(getResumeSpecificFallback(i, keywords, resumeText));
+        questions.push(getFallbackQuestion(i, focus));
       }
     }
 
     while (questions.length < 5) {
-      questions.push(getResumeSpecificFallback(questions.length, keywords, resumeText));
+      questions.push(getFallbackQuestion(questions.length, focus));
     }
 
     console.log("✅ All 5 questions generated successfully");
@@ -637,30 +658,37 @@ Return ONLY the question text.`
     console.error('❌ Interview Generation Error:', err);
     
     const fallbackQuestions = [
-      "Based on your resume, walk me through your most challenging technical project. What specific technologies did you use?",
-      "Describe a situation where you had to learn a new technology quickly for a project.",
-      "How do you ensure code quality and maintainability in your projects?",
-      "Tell me about a time you had to debug a complex issue.",
-      "Write a function that demonstrates your understanding of core programming concepts."
+      "Tell me about your most challenging technical project and what you learned from it.",
+      "How do you approach learning new technologies or skills?",
+      "Describe a time when you had to debug a complex issue.",
+      "What are your strengths and how have you applied them in your projects?",
+      "Where do you see yourself in your career in the next 2 years?"
     ];
     
     res.json({ questions: fallbackQuestions });
   }
 });
 
-function getResumeSpecificFallback(index, keywords, resumeText) {
-  const mainTech = keywords[0] || 'your primary technology';
-  const secondaryTech = keywords[1] || 'key skills';
-  
-  const fallbacks = [
-    `What experience do you have with ${mainTech}? Can you give specific examples from projects mentioned in your resume?`,
-    `Describe a project where you used ${secondaryTech} to solve a real-world problem. What was your role?`,
-    `How would you approach optimizing a ${mainTech} application for better performance?`,
-    `Tell me about a time you had to collaborate with a team on a technical project.`,
-    `Write a solution for a problem related to ${mainTech}. Explain your approach.`
-  ];
-  
-  return fallbacks[index % fallbacks.length];
+function getFallbackQuestion(index, focus) {
+  if (focus.primary === 'data') {
+    const fallbacks = [
+      "What experience do you have with SQL and how have you used it in your projects?",
+      "Describe a data analysis project where you had to clean messy data. What approach did you take?",
+      "How do you ensure the accuracy of your data analysis and reports?",
+      "Tell me about your experience with Power BI or similar visualization tools.",
+      "Write a SQL query to find the top 5 customers by total purchase amount."
+    ];
+    return fallbacks[index % fallbacks.length];
+  } else {
+    const fallbacks = [
+      "What experience do you have with React and how do you manage state in your applications?",
+      "Describe a full-stack application you built from scratch.",
+      "How do you handle API integration in your projects?",
+      "Tell me about your experience with MongoDB and database design.",
+      "Write a React component that fetches and displays data from an API."
+    ];
+    return fallbacks[index % fallbacks.length];
+  }
 }
 
 module.exports = router;
