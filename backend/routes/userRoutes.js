@@ -4,58 +4,70 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const TestResult = require('../models/TestResult');
 const fetch = require('node-fetch');
-
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 
 const router = express.Router();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-async function generateInterviewQuestion(prompt) {
+// Utility function for Gemini API calls with retry logic
+async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  
+  const requestBody = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      maxOutputTokens: 1000,
+      temperature: 0.7,
+      topP: 0.9
+    }
+  };
+  
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-    const body = {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        maxOutputTokens: 300,
-        temperature: 0.8,
-        topP: 0.9
-      }
-    };
-
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body),
-      timeout: 15000
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error(`Gemini API error: ${response.status}`, errorData);
-      
-      if (response.status === 429) {
-        console.log('Rate limit hit, waiting 3 seconds...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        return generateInterviewQuestion(prompt);
+    
+    clearTimeout(timeoutId);
+    
+    // Handle rate limiting with exponential backoff
+    if (response.status === 429) {
+      if (retryCount < maxRetries) {
+        const delay = Math.min(2000 * Math.pow(2, retryCount) + Math.random() * 1000, 15000);
+        console.log(`⚠️ Rate limit hit. Retry ${retryCount + 1}/${maxRetries} in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return callGeminiAPI(prompt, retryCount + 1, maxRetries);
+      } else {
+        throw new Error('Rate limit exceeded. Please try again later.');
       }
-      return null;
     }
-
+    
+    if (!response.ok) {
+      throw new Error(`API Error ${response.status}`);
+    }
+    
     const data = await response.json();
     
     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      console.warn('Unexpected AI response structure:', data);
-      return null;
+      throw new Error('Invalid API response structure');
     }
     
     return data.candidates[0].content.parts[0].text.trim();
+    
   } catch (error) {
-    console.error('Error in generateInterviewQuestion:', error.message);
-    return null;
+    if (retryCount < maxRetries && (error.name === 'AbortError' || error.message.includes('network'))) {
+      const delay = 2000 * Math.pow(2, retryCount);
+      console.log(`⚠️ Network error, retry ${retryCount + 1}/${maxRetries} in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return callGeminiAPI(prompt, retryCount + 1, maxRetries);
+    }
+    throw error;
   }
 }
 
@@ -181,10 +193,11 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Evaluate test route - AI powered
+// Evaluate test route - BATCH ALL QUESTIONS IN ONE API CALL
 router.post('/evaluate-test', authenticateToken, async (req, res) => {
   try {
     const { resumeText, questions, answers } = req.body;
+    
     if (!resumeText || !questions || !answers) {
       return res.status(400).json({ error: "Missing data." });
     }
@@ -193,8 +206,6 @@ router.post('/evaluate-test', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Questions and answers count mismatch" });
     }
 
-    let totalScore = 0;
-    let details = [];
     const userId = req.user.userId;
 
     if (!process.env.GEMINI_API_KEY) {
@@ -202,120 +213,159 @@ router.post('/evaluate-test', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: "AI service not configured" });
     }
 
-    // Process each question
-    for (let i = 0; i < questions.length; i++) {
-      const question = questions[i];
-      const answer = answers[i] || "No answer given";
+    console.log(`📊 Evaluating ${questions.length} questions in a single batch request...`);
 
-      const prompt = `You are an experienced interviewer. Evaluate this answer based on the candidate's resume.
+    // Create a single prompt that asks for evaluation of all questions at once
+    let evaluationPrompt = `You are an experienced technical interviewer. Evaluate ALL the following interview answers based on the candidate's resume.
 
 CANDIDATE'S RESUME:
 ${resumeText.substring(0, 2000)}
 
-QUESTION ASKED:
-${question}
+Here are the interview questions and the candidate's answers:
 
-CANDIDATE'S ANSWER:
-${answer}
+`;
 
-Provide evaluation in this exact format:
+    // Add all questions and answers to the prompt
+    for (let i = 0; i < questions.length; i++) {
+      evaluationPrompt += `
+QUESTION ${i + 1}:
+${questions[i]}
+
+CANDIDATE'S ANSWER ${i + 1}:
+${answers[i] || "No answer given"}
+
+---
+`;
+    }
+
+    evaluationPrompt += `
+IMPORTANT: Provide your evaluation in the following EXACT format for EACH question:
+
+QUESTION 1:
 SCORE: [number 0-20]
 FEEDBACK: [2-3 sentences of constructive feedback]
 
-SCORE:`;
+QUESTION 2:
+SCORE: [number 0-20]
+FEEDBACK: [2-3 sentences of constructive feedback]
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
-      
-      const requestBody = {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: 200,
-          temperature: 0.3
-        }
-      };
+QUESTION 3:
+SCORE: [number 0-20]
+FEEDBACK: [2-3 sentences of constructive feedback]
 
-      console.log(`📊 Evaluating question ${i + 1}/${questions.length}`);
+QUESTION 4:
+SCORE: [number 0-20]
+FEEDBACK: [2-3 sentences of constructive feedback]
 
-      let numericScore = 10;
-      let feedback = "Evaluation in progress...";
+QUESTION 5:
+SCORE: [number 0-20]
+FEEDBACK: [2-3 sentences of constructive feedback]
 
-      try {
-        const aiRes = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody)
-        });
+Provide scores between 0-20 for each question based on relevance, accuracy, completeness, and communication.`;
 
-        if (aiRes.status === 429) {
-          feedback = "Rate limit reached. Using default evaluation.";
-          console.log("⚠️ Rate limit hit");
-        } else if (!aiRes.ok) {
-          feedback = "Unable to evaluate at this time.";
-          console.error(`API Error: ${aiRes.status}`);
-        } else {
-          const aiData = await aiRes.json();
-          const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          console.log(`AI Response: ${aiText.substring(0, 200)}`);
-          
-          // Parse score and feedback
-          const scoreMatch = aiText.match(/SCORE:\s*(\d{1,2})/i);
-          if (scoreMatch) {
-            numericScore = parseInt(scoreMatch[1], 10);
-            numericScore = Math.min(Math.max(numericScore, 0), 20);
-          }
-          
-          const feedbackMatch = aiText.match(/FEEDBACK:\s*([\s\S]+?)(?=$|SCORE:)/i);
-          if (feedbackMatch) {
-            feedback = feedbackMatch[1].trim();
-          } else {
-            feedback = aiText.replace(/SCORE:\s*\d+/i, '').trim() || "Good effort!";
-          }
-        }
-      } catch (error) {
-        console.error(`Error: ${error.message}`);
-        feedback = "Network issue. Answer recorded.";
-      }
-
-      totalScore += numericScore;
-      
-      details.push({
-        question: question,
-        answer: answer,
-        individualScore: numericScore,
-        feedback: feedback
-      });
-
-      console.log(`📝 Question ${i + 1}: Score ${numericScore}/20`);
-      
-      // Delay to avoid rate limits
-      if (i < questions.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
-
-    // Save to database
     try {
-      const testResult = new TestResult({
-        userId,
-        totalScore,
-        questions: details,
-        createdAt: new Date()
+      // Make a single API call for all questions
+      const aiResponse = await callGeminiAPI(evaluationPrompt, 0, 3);
+      
+      console.log("✅ Batch evaluation completed");
+      console.log("AI Response preview:", aiResponse.substring(0, 500));
+      
+      // Parse the response to extract scores and feedback for each question
+      let totalScore = 0;
+      let details = [];
+      
+      for (let i = 1; i <= questions.length; i++) {
+        let numericScore = 10;
+        let feedback = "Evaluation completed.";
+        
+        // Extract score for this question
+        const questionRegex = new RegExp(`QUESTION ${i}:\\s*(?:SCORE:\\s*(\\d{1,2})|.*?SCORE:\\s*(\\d{1,2}))`, 'is');
+        const scoreMatch = aiResponse.match(questionRegex);
+        
+        if (scoreMatch) {
+          const scoreValue = scoreMatch[1] || scoreMatch[2];
+          numericScore = parseInt(scoreValue, 10);
+          numericScore = Math.min(Math.max(numericScore, 0), 20);
+        }
+        
+        // Extract feedback for this question
+        const feedbackRegex = new RegExp(`QUESTION ${i}:[\\s\\S]*?FEEDBACK:\\s*([^\\n]+(?:\\n(?!QUESTION|SCORE:)[^\\n]+)*)`, 'i');
+        const feedbackMatch = aiResponse.match(feedbackRegex);
+        
+        if (feedbackMatch) {
+          feedback = feedbackMatch[1].trim();
+        } else {
+          // Try alternative pattern
+          const altFeedbackRegex = new RegExp(`${i}\\.\\s*Score:\\s*\\d+\\s*Feedback:\\s*([^\\n]+)`, 'i');
+          const altMatch = aiResponse.match(altFeedbackRegex);
+          if (altMatch) {
+            feedback = altMatch[1].trim();
+          }
+        }
+        
+        totalScore += numericScore;
+        
+        details.push({
+          question: questions[i - 1],
+          answer: answers[i - 1] || "No answer given",
+          individualScore: numericScore,
+          feedback: feedback
+        });
+        
+        console.log(`📝 Question ${i}: Score ${numericScore}/20 - ${feedback.substring(0, 50)}...`);
+      }
+      
+      // Save to database
+      try {
+        const testResult = new TestResult({
+          userId,
+          totalScore,
+          questions: details,
+          createdAt: new Date()
+        });
+        await testResult.save();
+        console.log(`✅ Test saved: ${totalScore}/100`);
+      } catch (dbError) {
+        console.error("❌ DB error:", dbError.message);
+      }
+      
+      res.json({ 
+        success: true,
+        score: totalScore, 
+        details: details
       });
-      await testResult.save();
-      console.log(`✅ Test saved: ${totalScore}/100`);
-    } catch (dbError) {
-      console.error("❌ DB error:", dbError.message);
+      
+    } catch (error) {
+      console.error("❌ AI evaluation error:", error.message);
+      
+      // Fallback: Provide default scores if AI fails
+      console.log("⚠️ Using fallback evaluation");
+      let totalScore = 0;
+      let details = [];
+      
+      for (let i = 0; i < questions.length; i++) {
+        const defaultScore = 15;
+        totalScore += defaultScore;
+        
+        details.push({
+          question: questions[i],
+          answer: answers[i] || "No answer given",
+          individualScore: defaultScore,
+          feedback: "Evaluation temporarily unavailable. Please contact support if this persists."
+        });
+      }
+      
+      res.json({ 
+        success: true,
+        score: totalScore, 
+        details: details,
+        warning: "Used fallback evaluation due to AI service issues"
+      });
     }
-
-    res.json({ 
-      success: true,
-      score: totalScore, 
-      details: details
-    });
 
   } catch (err) {
-    console.error("❌ Error:", err);
-    res.status(500).json({ error: "Failed to evaluate test." });
+    console.error("❌ Error in evaluation:", err);
+    res.status(500).json({ error: "Failed to evaluate test. Please try again." });
   }
 });
 
@@ -427,7 +477,6 @@ router.post('/start-interview', authenticateToken, async (req, res) => {
     const { resumeText } = req.body;
     if (!resumeText) return res.status(400).json({ error: "Resume text is required" });
 
-    // This prompt is the "Brain" - it tells Gemini exactly what to do
     const prompt = `
       You are an expert technical interviewer. Based on the following resume text, 
       generate exactly 5 interview questions. 
@@ -439,34 +488,57 @@ router.post('/start-interview', authenticateToken, async (req, res) => {
       4. Provide the questions as a numbered list from 1 to 5.
       
       Resume Text:
-      ${resumeText}
+      ${resumeText.substring(0, 3000)}
     `;
 
-    const rawResponse = await generateInterviewQuestion(prompt);
-
-    if (!rawResponse) {
-      // Fallback only if the API fails completely
-      return res.json({
+    console.log("🎯 Generating interview questions...");
+    
+    try {
+      const rawResponse = await callGeminiAPI(prompt, 0, 3);
+      
+      if (!rawResponse) {
+        throw new Error("No response from AI");
+      }
+      
+      console.log("✅ Questions generated successfully");
+      
+      // Split the numbered list into an array of 5 strings
+      let questions = rawResponse
+        .split(/\d\.\s+/)
+        .filter(q => q.trim().length > 0)
+        .slice(0, 5);
+      
+      // Ensure we have exactly 5 questions
+      if (questions.length !== 5) {
+        console.log(`Expected 5 questions, got ${questions.length}. Using fallback.`);
+        questions = [
+          "Can you introduce yourself and tell me about your background?",
+          "What is your most challenging project and how did you overcome obstacles?",
+          "Explain a technical concept you're passionate about and why it matters.",
+          "How do you handle tight deadlines and pressure?",
+          "Write a function to reverse a linked list. Explain your approach."
+        ];
+      }
+      
+      res.json({ questions });
+      
+    } catch (error) {
+      console.error("AI generation error:", error.message);
+      // Fallback questions
+      res.json({
         questions: [
-          "Can you introduce yourself?",
-          "What is your favorite programming language?",
-          "Explain a challenging project you worked on.",
-          "How do you handle deadlines?",
-          "Write a function to reverse a string."
+          "Can you introduce yourself and tell me about your background?",
+          "What is your most challenging project and how did you overcome obstacles?",
+          "Explain a technical concept you're passionate about and why it matters.",
+          "How do you handle tight deadlines and pressure?",
+          "Write a function to check if a string is a palindrome. Explain your approach."
         ]
       });
     }
-
-    // Split the numbered list into an array of 5 strings
-    const questions = rawResponse
-      .split(/\d\.\s+/)
-      .filter(q => q.trim().length > 0)
-      .slice(0, 5);
-
-    res.json({ questions });
+    
   } catch (err) {
     console.error("Start interview error:", err);
-    res.status(500).json({ error: "Failed to start interview" });
+    res.status(500).json({ error: "Failed to start interview. Please try again." });
   }
 });
 
