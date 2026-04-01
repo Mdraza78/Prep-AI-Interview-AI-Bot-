@@ -93,13 +93,69 @@ export default function Test() {
   const [error, setError] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [retryMessage, setRetryMessage] = useState("");
+  const [debugInfo, setDebugInfo] = useState("");
 
   const userName = localStorage.getItem("name") || "User";
   const navigate = useNavigate();
   const recognitionRef = useRef(null);
   const speechSynthesisRef = useRef(null);
 
+  // Improved speech synthesis function
+  const speakText = (text) => {
+    if (!window.speechSynthesis) {
+      console.log('Speech synthesis not supported');
+      setDebugInfo('Speech synthesis not supported in this browser');
+      return;
+    }
+
+    // Cancel any ongoing speech
+    try {
+      window.speechSynthesis.cancel();
+    } catch (e) {
+      console.error('Error canceling speech:', e);
+    }
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.97;
+    utter.pitch = 1;
+    utter.volume = 1;
+    
+    // Wait for voices to be loaded
+    const speak = () => {
+      setIsSpeaking(true);
+      utter.onend = () => {
+        setIsSpeaking(false);
+        console.log('Speech finished');
+      };
+      utter.onerror = (event) => {
+        console.error('Speech synthesis error:', event);
+        setIsSpeaking(false);
+        setDebugInfo(`Speech error: ${event.error}`);
+      };
+      
+      // Small delay to ensure cancel is processed
+      setTimeout(() => {
+        try {
+          window.speechSynthesis.speak(utter);
+        } catch (e) {
+          console.error('Error speaking:', e);
+          setIsSpeaking(false);
+        }
+      }, 100);
+    };
+
+    // Check if voices are loaded
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        speak();
+      };
+    } else {
+      speak();
+    }
+  };
+
   useEffect(() => {
+    // Setup speech recognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       setRecognitionSupported(true);
@@ -108,44 +164,63 @@ export default function Test() {
       recognition.interimResults = false;
       recognition.lang = "en-US";
 
-      recognition.onstart = () => setIsRecording(true);
+      recognition.onstart = () => {
+        console.log('Recording started');
+        setIsRecording(true);
+      };
+      
       recognition.onresult = (event) => {
         let transcript = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
         }
+        console.log('Transcript:', transcript);
         setAnswerInput(transcript.trim());
       };
+      
       recognition.onerror = (event) => {
-        setIsRecording(false);
         console.error("Speech recognition error:", event.error);
+        setIsRecording(false);
+        setDebugInfo(`Speech recognition error: ${event.error}`);
         if (event.error === "not-allowed") {
           alert("Microphone access denied. Please allow microphone permission.");
         }
       };
-      recognition.onend = () => setIsRecording(false);
+      
+      recognition.onend = () => {
+        console.log('Recording ended');
+        setIsRecording(false);
+      };
+      
       recognitionRef.current = recognition;
+    } else {
+      setDebugInfo('Speech recognition not supported in this browser');
     }
 
-    if ("speechSynthesis" in window) {
-      speechSynthesisRef.current = window.speechSynthesis;
-    }
-
+    // Fetch questions
     async function fetchQuestions() {
       setIsLoadingQuestions(true);
       setError(null);
+      setDebugInfo("Fetching questions from server...");
+      
       try {
         const token = localStorage.getItem("token");
         if (!token) {
+          console.error("No token found");
           navigate("/login");
           return;
         }
+        
         const resumeText = localStorage.getItem("resumeText");
         if (!resumeText) {
+          console.error("No resume text found");
           alert("No resume text found. Please upload your resume first.");
           navigate("/dashboard");
           return;
         }
+        
+        console.log("Sending request to:", API_URLS.START_INTERVIEW);
+        console.log("Resume text length:", resumeText.length);
         
         const res = await fetch(API_URLS.START_INTERVIEW, {
           method: "POST",
@@ -156,52 +231,60 @@ export default function Test() {
           body: JSON.stringify({ resumeText }),
         });
         
+        console.log("Response status:", res.status);
+        
         if (!res.ok) {
           const errorData = await res.json();
-          throw new Error(errorData.error || "Failed to fetch questions");
+          console.error("Error response:", errorData);
+          throw new Error(errorData.error || `Failed to fetch questions (Status: ${res.status})`);
         }
         
         const data = await res.json();
+        console.log("Questions received:", data);
+        setDebugInfo(`Received ${data.questions?.length || 0} questions`);
+        
         if (data.questions && data.questions.length === 5) {
           setQuestions(data.questions);
           setAnswers(Array(data.questions.length).fill(""));
           setAnswerInput("");
+          
+          // Small delay before speaking first question
           setTimeout(() => {
+            console.log("Speaking first question:", data.questions[0]);
             speakText(data.questions[0]);
           }, 500);
         } else {
-          alert("Unexpected number of questions received. Expected 5.");
+          console.warn("Unexpected number of questions:", data.questions?.length);
+          alert(`Unexpected number of questions received. Expected 5, got ${data.questions?.length || 0}.`);
         }
       } catch (err) {
         console.error("Error fetching questions:", err);
         setError(err.message || "Error fetching questions!");
+        setDebugInfo(`Error: ${err.message}`);
       } finally {
         setIsLoadingQuestions(false);
       }
     }
+    
     fetchQuestions();
 
     return () => {
-      if (recognitionRef.current) recognitionRef.current.stop();
-      if (speechSynthesisRef.current) speechSynthesisRef.current.cancel();
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.error('Error stopping recognition:', e);
+        }
+      }
+      if (window.speechSynthesis) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch (e) {
+          console.error('Error canceling speech:', e);
+        }
+      }
     };
   }, [navigate]);
-
-  function speakText(text) {
-    if (!speechSynthesisRef.current) return;
-    speechSynthesisRef.current.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = 0.97;
-    utter.pitch = 1;
-    utter.volume = 1;
-    setIsSpeaking(true);
-    utter.onend = () => setIsSpeaking(false);
-    utter.onerror = () => {
-      setIsSpeaking(false);
-      console.error("Speech synthesis error");
-    };
-    speechSynthesisRef.current.speak(utter);
-  }
 
   const startRecording = async () => {
     if (currentIndex === 4) {
@@ -215,6 +298,7 @@ export default function Test() {
     }
 
     try {
+      // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
 
@@ -222,6 +306,7 @@ export default function Test() {
       setAnswerInput("");
       recognitionRef.current.start();
 
+      // Auto-stop after 30 seconds
       setTimeout(() => {
         if (recognitionRef.current && isRecording) {
           recognitionRef.current.stop();
@@ -251,9 +336,11 @@ export default function Test() {
       alert("Please provide an answer before continuing.");
       return;
     }
+    
     const temp = [...answers];
     temp[currentIndex] = trimmed;
     setAnswers(temp);
+    
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex(currentIndex + 1);
       setAnswerInput(temp[currentIndex + 1] || "");
@@ -265,6 +352,7 @@ export default function Test() {
     const temp = [...answers];
     temp[currentIndex] = "";
     setAnswers(temp);
+    
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex(currentIndex + 1);
       setAnswerInput(temp[currentIndex + 1] || "");
@@ -273,7 +361,9 @@ export default function Test() {
   };
 
   const handleReplayQuestion = () => {
-    speakText(questions[currentIndex]);
+    if (questions[currentIndex]) {
+      speakText(questions[currentIndex]);
+    }
   };
 
   const handleEndTest = async () => {
@@ -295,6 +385,7 @@ export default function Test() {
     setIsSubmitting(true);
     setError(null);
     setRetryMessage("");
+    setDebugInfo("Submitting answers for evaluation...");
     
     let retryCount = 0;
     const maxRetries = 3;
@@ -302,6 +393,8 @@ export default function Test() {
     const submitEvaluation = async () => {
       try {
         const resumeText = localStorage.getItem("resumeText");
+        console.log("Submitting evaluation with", questions.length, "questions");
+        
         const res = await fetch(API_URLS.EVALUATE_TEST, {
           method: "POST",
           headers: {
@@ -315,29 +408,36 @@ export default function Test() {
           }),
         });
         
+        console.log("Evaluation response status:", res.status);
+        
         // Handle rate limiting with retry
         if (res.status === 429 && retryCount < maxRetries) {
           retryCount++;
           const delay = 4000 * retryCount;
           setRetryMessage(`⚠️ Rate limit reached. Retrying in ${delay/1000} seconds... (Attempt ${retryCount}/${maxRetries})`);
+          setDebugInfo(`Rate limited, retrying in ${delay/1000}s...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           return submitEvaluation();
         }
         
         if (!res.ok) {
           const errorData = await res.json();
-          throw new Error(errorData.error || "Evaluation failed");
+          console.error("Evaluation error:", errorData);
+          throw new Error(errorData.error || `Evaluation failed (Status: ${res.status})`);
         }
         
         const data = await res.json();
+        console.log("Evaluation results:", data);
         setScore(data.score);
         setResultDetails(data.details || []);
         setShowFeedback(true);
         setError(null);
         setRetryMessage("");
+        setDebugInfo(`Evaluation complete! Score: ${data.score}/100`);
       } catch (err) {
         console.error("Error submitting test:", err);
         setError(err.message || "Error submitting test. Please try again.");
+        setDebugInfo(`Submission error: ${err.message}`);
         setIsSubmitting(false);
       }
     };
@@ -512,9 +612,16 @@ export default function Test() {
 
       <main className="flex-1 w-full py-6 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
+          {/* Debug info (hidden in production, remove if not needed) */}
+          {debugInfo && (
+            <div className="mb-4 p-2 bg-blue-600/20 border border-blue-600 rounded-lg text-blue-400 text-xs text-center">
+              🔍 Debug: {debugInfo}
+            </div>
+          )}
+          
           {error && (
             <div className="mb-4 p-4 bg-red-600/20 border border-red-600 rounded-lg text-red-400 text-center">
-              {error}
+              ❌ {error}
             </div>
           )}
           
@@ -533,6 +640,7 @@ export default function Test() {
           ) : questions.length !== 5 ? (
             <div className="text-center py-20">
               <p className="text-gray-300 text-lg">Expected 5 questions, found {questions.length}.</p>
+              <p className="text-gray-400 text-sm mt-2">Please go back and try again.</p>
               <button
                 onClick={() => navigate("/dashboard")}
                 className="mt-4 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
@@ -549,10 +657,13 @@ export default function Test() {
                   </span>
                   <button
                     onClick={handleReplayQuestion}
-                    className="flex items-center space-x-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg"
+                    className="flex items-center space-x-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                    disabled={isSpeaking}
                   >
                     <Volume2 size={16} className="text-white" />
-                    <span className="text-white text-sm hidden sm:block">Replay</span>
+                    <span className="text-white text-sm hidden sm:block">
+                      {isSpeaking ? "Speaking..." : "Replay"}
+                    </span>
                   </button>
                 </div>
                 
@@ -600,7 +711,7 @@ export default function Test() {
                       <textarea
                         readOnly
                         rows={4}
-                        className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none"
+                        className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none cursor-default"
                         placeholder="Your voice answer will appear here..."
                         value={answerInput}
                       />
@@ -608,7 +719,7 @@ export default function Test() {
                   ) : (
                     <textarea
                       rows={6}
-                      className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-500"
+                      className="w-full p-4 rounded-lg border border-gray-600 bg-gray-700/50 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                       placeholder="Type your code solution here..."
                       value={answerInput}
                       onChange={(e) => setAnswerInput(e.target.value)}
