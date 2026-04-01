@@ -10,31 +10,42 @@ const pdfParse = require('pdf-parse');
 const router = express.Router();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// Utility function for Gemini API calls with retry logic
+// Utility function for Gemini API calls with retry logic and better error handling
 async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
   
   const requestBody = {
-    contents: [{ parts: [{ text: prompt }] }],
+    contents: [{ 
+      parts: [{ 
+        text: prompt 
+      }] 
+    }],
     generationConfig: {
       maxOutputTokens: 1000,
       temperature: 0.7,
-      topP: 0.9
+      topP: 0.9,
+      topK: 40
     }
   };
   
+  console.log(`📡 Calling Gemini API (Attempt ${retryCount + 1}/${maxRetries + 1})...`);
+  
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
     
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify(requestBody),
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
+    
+    console.log(`📊 API Response Status: ${response.status}`);
     
     // Handle rate limiting with exponential backoff
     if (response.status === 429) {
@@ -44,26 +55,53 @@ async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
         await new Promise(resolve => setTimeout(resolve, delay));
         return callGeminiAPI(prompt, retryCount + 1, maxRetries);
       } else {
-        throw new Error('Rate limit exceeded. Please try again later.');
+        throw new Error('Rate limit exceeded after multiple retries');
       }
     }
     
     if (!response.ok) {
-      throw new Error(`API Error ${response.status}`);
+      const errorText = await response.text();
+      console.error(`❌ API Error Response: ${errorText}`);
+      throw new Error(`API Error ${response.status}: ${errorText.substring(0, 200)}`);
     }
     
     const data = await response.json();
     
-    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid API response structure');
+    // Log the response structure for debugging
+    console.log('📦 API Response Structure:', Object.keys(data));
+    
+    if (!data.candidates || !data.candidates[0]) {
+      console.error('❌ No candidates in response:', JSON.stringify(data, null, 2));
+      throw new Error('No candidates in API response');
     }
     
-    return data.candidates[0].content.parts[0].text.trim();
+    if (!data.candidates[0].content || !data.candidates[0].content.parts) {
+      console.error('❌ Invalid content structure:', JSON.stringify(data.candidates[0], null, 2));
+      throw new Error('Invalid content structure in API response');
+    }
+    
+    const generatedText = data.candidates[0].content.parts[0].text;
+    
+    if (!generatedText || generatedText.trim().length === 0) {
+      console.error('❌ Empty response from API');
+      throw new Error('Empty response from API');
+    }
+    
+    console.log(`✅ API Response Received (${generatedText.length} chars)`);
+    console.log('📝 Response Preview:', generatedText.substring(0, 300));
+    
+    return generatedText.trim();
     
   } catch (error) {
-    if (retryCount < maxRetries && (error.name === 'AbortError' || error.message.includes('network'))) {
+    console.error(`❌ API Call Error (Attempt ${retryCount + 1}):`, error.message);
+    
+    if (retryCount < maxRetries && 
+        (error.name === 'AbortError' || 
+         error.message.includes('network') || 
+         error.message.includes('fetch') ||
+         error.message.includes('timeout'))) {
       const delay = 2000 * Math.pow(2, retryCount);
-      console.log(`⚠️ Network error, retry ${retryCount + 1}/${maxRetries} in ${delay}ms...`);
+      console.log(`⚠️ Retrying in ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return callGeminiAPI(prompt, retryCount + 1, maxRetries);
     }
@@ -95,7 +133,10 @@ router.post('/upload-resume', upload.single('resume'), async (req, res) => {
 
     const pdfBuffer = req.file.buffer;
     const data = await pdfParse(pdfBuffer);
-
+    
+    console.log(`📄 Resume parsed: ${data.text.length} characters`);
+    
+    // Store the parsed resume text in a temporary location or return it
     res.json({ text: data.text });
   } catch (err) {
     console.error('PDF parsing error:', err);
@@ -219,7 +260,7 @@ router.post('/evaluate-test', authenticateToken, async (req, res) => {
     let evaluationPrompt = `You are an experienced technical interviewer. Evaluate ALL the following interview answers based on the candidate's resume.
 
 CANDIDATE'S RESUME:
-${resumeText.substring(0, 2000)}
+${resumeText.substring(0, 2500)}
 
 Here are the interview questions and the candidate's answers:
 
@@ -268,7 +309,6 @@ Provide scores between 0-20 for each question based on relevance, accuracy, comp
       const aiResponse = await callGeminiAPI(evaluationPrompt, 0, 3);
       
       console.log("✅ Batch evaluation completed");
-      console.log("AI Response preview:", aiResponse.substring(0, 500));
       
       // Parse the response to extract scores and feedback for each question
       let totalScore = 0;
@@ -278,28 +318,40 @@ Provide scores between 0-20 for each question based on relevance, accuracy, comp
         let numericScore = 10;
         let feedback = "Evaluation completed.";
         
-        // Extract score for this question
-        const questionRegex = new RegExp(`QUESTION ${i}:\\s*(?:SCORE:\\s*(\\d{1,2})|.*?SCORE:\\s*(\\d{1,2}))`, 'is');
-        const scoreMatch = aiResponse.match(questionRegex);
+        // Extract score for this question - multiple pattern attempts
+        const patterns = [
+          new RegExp(`QUESTION ${i}:\\s*SCORE:\\s*(\\d{1,2})`, 'i'),
+          new RegExp(`QUESTION ${i}[\\s\\S]*?SCORE:\\s*(\\d{1,2})`, 'i'),
+          new RegExp(`${i}\\.\\s*Score:\\s*(\\d{1,2})`, 'i'),
+          new RegExp(`Score for question ${i}:\\s*(\\d{1,2})`, 'i')
+        ];
         
-        if (scoreMatch) {
-          const scoreValue = scoreMatch[1] || scoreMatch[2];
+        let scoreValue = null;
+        for (const pattern of patterns) {
+          const match = aiResponse.match(pattern);
+          if (match) {
+            scoreValue = match[1];
+            break;
+          }
+        }
+        
+        if (scoreValue) {
           numericScore = parseInt(scoreValue, 10);
           numericScore = Math.min(Math.max(numericScore, 0), 20);
         }
         
         // Extract feedback for this question
-        const feedbackRegex = new RegExp(`QUESTION ${i}:[\\s\\S]*?FEEDBACK:\\s*([^\\n]+(?:\\n(?!QUESTION|SCORE:)[^\\n]+)*)`, 'i');
-        const feedbackMatch = aiResponse.match(feedbackRegex);
+        const feedbackPatterns = [
+          new RegExp(`QUESTION ${i}:[\\s\\S]*?FEEDBACK:\\s*([^\\n]+(?:\\n(?!QUESTION|SCORE:)[^\\n]+)*)`, 'i'),
+          new RegExp(`${i}\\.\\s*Score:\\s*\\d+\\s*Feedback:\\s*([^\\n]+)`, 'i'),
+          new RegExp(`Feedback for question ${i}:\\s*([^\\n]+)`, 'i')
+        ];
         
-        if (feedbackMatch) {
-          feedback = feedbackMatch[1].trim();
-        } else {
-          // Try alternative pattern
-          const altFeedbackRegex = new RegExp(`${i}\\.\\s*Score:\\s*\\d+\\s*Feedback:\\s*([^\\n]+)`, 'i');
-          const altMatch = aiResponse.match(altFeedbackRegex);
-          if (altMatch) {
-            feedback = altMatch[1].trim();
+        for (const pattern of feedbackPatterns) {
+          const match = aiResponse.match(pattern);
+          if (match) {
+            feedback = match[1].trim();
+            break;
           }
         }
         
@@ -312,7 +364,7 @@ Provide scores between 0-20 for each question based on relevance, accuracy, comp
           feedback: feedback
         });
         
-        console.log(`📝 Question ${i}: Score ${numericScore}/20 - ${feedback.substring(0, 50)}...`);
+        console.log(`📝 Question ${i}: Score ${numericScore}/20`);
       }
       
       // Save to database
@@ -339,7 +391,6 @@ Provide scores between 0-20 for each question based on relevance, accuracy, comp
       console.error("❌ AI evaluation error:", error.message);
       
       // Fallback: Provide default scores if AI fails
-      console.log("⚠️ Using fallback evaluation");
       let totalScore = 0;
       let details = [];
       
@@ -351,7 +402,7 @@ Provide scores between 0-20 for each question based on relevance, accuracy, comp
           question: questions[i],
           answer: answers[i] || "No answer given",
           individualScore: defaultScore,
-          feedback: "Evaluation temporarily unavailable. Please contact support if this persists."
+          feedback: "Evaluation temporarily unavailable. Our AI service is experiencing high demand. Your answers have been recorded and will be evaluated later."
         });
       }
       
@@ -475,71 +526,151 @@ router.patch('/profile', authenticateToken, async (req, res) => {
 router.post('/start-interview', authenticateToken, async (req, res) => {
   try {
     const { resumeText } = req.body;
-    if (!resumeText) return res.status(400).json({ error: "Resume text is required" });
-
-    const prompt = `
-      You are an expert technical interviewer. Based on the following resume text, 
-      generate exactly 5 interview questions. 
-      
-      Requirements:
-      1. The first 4 questions should be technical/behavioral based on their projects and skills.
-      2. The 5th question MUST be a coding logic question (Data Structures or Algorithms).
-      3. Do NOT include any introductory text like "Sure, here are the questions".
-      4. Provide the questions as a numbered list from 1 to 5.
-      
-      Resume Text:
-      ${resumeText.substring(0, 3000)}
-    `;
-
-    console.log("🎯 Generating interview questions...");
     
+    if (!resumeText) {
+      console.error('❌ No resume text provided');
+      return res.status(400).json({ error: "Resume text is required" });
+    }
+
+    console.log(`📝 Resume text length: ${resumeText.length} characters`);
+    console.log('📄 Resume preview:', resumeText.substring(0, 500));
+
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("❌ GEMINI_API_KEY is missing from environment variables");
+      return res.status(500).json({ error: "AI service not configured. Please contact support." });
+    }
+
+    console.log('🔑 Gemini API Key exists:', !!process.env.GEMINI_API_KEY);
+    console.log('🔑 API Key first 5 chars:', process.env.GEMINI_API_KEY.substring(0, 5));
+
+    // Enhanced prompt with clearer instructions
+    const prompt = `You are an expert technical interviewer. Based on the following resume, generate exactly 5 interview questions.
+
+CRITICAL INSTRUCTIONS:
+1. Generate questions that are SPECIFIC to the candidate's resume content
+2. If the resume shows experience in certain technologies, ask about those technologies
+3. The 5th question MUST be a coding/algorithm question
+4. Output ONLY the questions, numbered 1 to 5
+5. Do NOT include any introductory text, explanations, or formatting
+
+RESUME CONTENT:
+${resumeText.substring(0, 3000)}
+
+Based on this resume, generate 5 personalized interview questions:`;
+
+    console.log("🎯 Sending request to Gemini API...");
+    console.log("📝 Prompt preview:", prompt.substring(0, 300));
+
     try {
       const rawResponse = await callGeminiAPI(prompt, 0, 3);
       
       if (!rawResponse) {
-        throw new Error("No response from AI");
+        throw new Error("Empty response from AI");
       }
       
-      console.log("✅ Questions generated successfully");
+      console.log("✅ Raw AI Response:", rawResponse);
       
-      // Split the numbered list into an array of 5 strings
-      let questions = rawResponse
-        .split(/\d\.\s+/)
-        .filter(q => q.trim().length > 0)
-        .slice(0, 5);
+      // Split the numbered list into an array of questions
+      let questions = [];
+      
+      // Method 1: Split by numbers (1., 2., etc)
+      const numberedMatches = rawResponse.match(/\d+\.\s*([^\d]+?)(?=\d+\.|$)/gs);
+      if (numberedMatches) {
+        questions = numberedMatches.map(q => q.replace(/^\d+\.\s*/, '').trim()).filter(q => q.length > 0);
+      }
+      
+      // Method 2: If method 1 fails, try splitting by newlines
+      if (questions.length === 0) {
+        questions = rawResponse.split('\n')
+          .filter(line => line.trim().length > 0 && !line.match(/^\d+\./))
+          .map(line => line.trim())
+          .slice(0, 5);
+      }
+      
+      // Method 3: If still no questions, try to extract from text
+      if (questions.length === 0) {
+        const lines = rawResponse.split('\n');
+        for (const line of lines) {
+          if (line.trim().length > 20 && !line.includes('SCORE:') && !line.includes('FEEDBACK:')) {
+            questions.push(line.trim());
+          }
+          if (questions.length === 5) break;
+        }
+      }
       
       // Ensure we have exactly 5 questions
       if (questions.length !== 5) {
-        console.log(`Expected 5 questions, got ${questions.length}. Using fallback.`);
-        questions = [
-          "Can you introduce yourself and tell me about your background?",
-          "What is your most challenging project and how did you overcome obstacles?",
-          "Explain a technical concept you're passionate about and why it matters.",
-          "How do you handle tight deadlines and pressure?",
-          "Write a function to reverse a linked list. Explain your approach."
+        console.log(`⚠️ Expected 5 questions, got ${questions.length}. Using generated questions with fallback.`);
+        
+        // If we have some questions but not enough, pad with fallbacks
+        const fallbackQuestions = [
+          "Can you describe your experience with the technologies mentioned in your resume?",
+          "Tell me about a challenging project you worked on and how you solved the problems.",
+          "How do you stay updated with the latest technologies in your field?",
+          "Describe a situation where you had to work under pressure and how you handled it.",
+          "Write a function to find the maximum sum subarray (Kadane's algorithm). Explain your approach."
         ];
+        
+        while (questions.length < 5) {
+          questions.push(fallbackQuestions[questions.length]);
+        }
       }
+      
+      // Clean up each question
+      questions = questions.slice(0, 5).map(q => q.trim().replace(/^["']|["']$/g, ''));
+      
+      console.log("✅ Final questions generated:");
+      questions.forEach((q, i) => {
+        console.log(`   ${i + 1}. ${q.substring(0, 100)}...`);
+      });
       
       res.json({ questions });
       
     } catch (error) {
-      console.error("AI generation error:", error.message);
-      // Fallback questions
-      res.json({
-        questions: [
-          "Can you introduce yourself and tell me about your background?",
-          "What is your most challenging project and how did you overcome obstacles?",
-          "Explain a technical concept you're passionate about and why it matters.",
-          "How do you handle tight deadlines and pressure?",
-          "Write a function to check if a string is a palindrome. Explain your approach."
-        ]
+      console.error("❌ AI generation error:", error.message);
+      console.error("Error stack:", error.stack);
+      
+      // Fallback to resume-specific questions based on extracted info
+      const fallbackQuestions = generateFallbackQuestions(resumeText);
+      console.log("⚠️ Using fallback questions");
+      
+      res.json({ 
+        questions: fallbackQuestions,
+        warning: "Using personalized fallback questions due to AI service load"
       });
     }
     
   } catch (err) {
-    console.error("Start interview error:", err);
+    console.error("❌ Start interview error:", err);
+    console.error("Error stack:", err.stack);
     res.status(500).json({ error: "Failed to start interview. Please try again." });
   }
 });
+
+// Helper function to generate fallback questions based on resume content
+function generateFallbackQuestions(resumeText) {
+  const resume = resumeText.toLowerCase();
+  
+  // Detect technologies from resume
+  const technologies = [];
+  const techKeywords = ['react', 'node', 'python', 'java', 'javascript', 'typescript', 'mongodb', 'sql', 'aws', 'docker', 'kubernetes', 'graphql', 'express'];
+  
+  techKeywords.forEach(tech => {
+    if (resume.includes(tech)) {
+      technologies.push(tech);
+    }
+  });
+  
+  const mainTech = technologies[0] || 'programming';
+  
+  // Generate personalized fallback questions
+  return [
+    `Based on your resume, can you tell me about your experience with ${technologies.slice(0, 3).join(', ') || 'relevant technologies'}?`,
+    `Describe a challenging project you mentioned in your resume and how you overcame obstacles.`,
+    `What do you consider your strongest technical skill, and how have you applied it in real projects?`,
+    `How do you approach debugging and problem-solving in ${mainTech} development?`,
+    `Write a function to find the first non-repeating character in a string. Explain your approach and time complexity.`
+  ];
+}
 
 module.exports = router;
