@@ -421,105 +421,52 @@ router.patch('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Start interview - LET GEMINI GENERATE QUESTIONS BASED ON RESUME
+// Start interview and generate 5 custom questions
 router.post('/start-interview', authenticateToken, async (req, res) => {
   try {
     const { resumeText } = req.body;
-    if (!resumeText) return res.status(400).json({ error: "Resume text required" });
+    if (!resumeText) return res.status(400).json({ error: "Resume text is required" });
 
-    console.log("📄 Resume text length:", resumeText.length);
-    console.log("📄 Resume preview:", resumeText.substring(0, 500));
+    // This prompt is the "Brain" - it tells Gemini exactly what to do
+    const prompt = `
+      You are an expert technical interviewer. Based on the following resume text, 
+      generate exactly 5 interview questions. 
+      
+      Requirements:
+      1. The first 4 questions should be technical/behavioral based on their projects and skills.
+      2. The 5th question MUST be a coding logic question (Data Structures or Algorithms).
+      3. Do NOT include any introductory text like "Sure, here are the questions".
+      4. Provide the questions as a numbered list from 1 to 5.
+      
+      Resume Text:
+      ${resumeText}
+    `;
 
-    // Let Gemini AI read the resume and generate 5 interview questions
-    const prompt = `You are an experienced technical interviewer. Based on this candidate's resume, generate 5 interview questions.
+    const rawResponse = await generateInterviewQuestion(prompt);
 
-RESUME:
-${resumeText.substring(0, 3000)}
-
-INSTRUCTIONS:
-1. Analyze the resume carefully - understand their skills, experience, and projects
-2. Generate 5 interview questions that are RELEVANT to what's in the resume
-3. If they are a Data Analyst, ask about SQL, Python, Power BI, and their data projects
-4. If they are a Developer, ask about their tech stack, coding, and development projects
-5. Make questions specific to their experience - mention their projects by name
-6. Vary question types: technical, behavioral, problem-solving, scenario-based
-7. Each question should be challenging but fair based on their experience level
-
-Return ONLY the 5 questions, one per line, numbered 1-5.
-
-Example format:
-1. [Question text]
-2. [Question text]
-3. [Question text]
-4. [Question text]
-5. [Question text]
-
-Generate questions now:`;
-
-    console.log("🤖 Asking Gemini to generate questions based on resume...");
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: 500,
-          temperature: 0.7
-        }
-      })
-    });
-
-    if (!response.ok) {
-      console.error("Gemini API error:", response.status);
-      throw new Error("Failed to generate questions");
+    if (!rawResponse) {
+      // Fallback only if the API fails completely
+      return res.json({
+        questions: [
+          "Can you introduce yourself?",
+          "What is your favorite programming language?",
+          "Explain a challenging project you worked on.",
+          "How do you handle deadlines?",
+          "Write a function to reverse a string."
+        ]
+      });
     }
 
-    const data = await response.json();
-    let questionsText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    
-    console.log("📝 Gemini response:", questionsText);
-    
-    // Parse questions from response
-    let questions = [];
-    const lines = questionsText.split('\n');
-    
-    for (const line of lines) {
-      const match = line.match(/^\d+\.\s*(.+)$/);
-      if (match) {
-        questions.push(match[1].trim());
-      }
-    }
-    
-    // If parsing failed, try to get any non-empty lines
-    if (questions.length === 0) {
-      questions = lines.filter(line => line.trim().length > 20).slice(0, 5);
-    }
-    
-    // Ensure we have 5 questions
-    while (questions.length < 5) {
-      questions.push("Tell me about your most significant technical achievement mentioned in your resume.");
-    }
-    
-    console.log(`✅ Generated ${questions.length} questions`);
-    console.log("1.", questions[0]);
-    console.log("2.", questions[1]);
-    
-    res.json({ questions: questions.slice(0, 5) });
+    // Split the numbered list into an array of 5 strings
+    const questions = rawResponse
+      .split(/\d\.\s+/)
+      .filter(q => q.trim().length > 0)
+      .slice(0, 5);
 
+    res.json({ questions });
   } catch (err) {
-    console.error('❌ Error generating questions:', err);
-    
-    // Fallback questions based on common resume sections
-    const fallbackQuestions = [
-      "Tell me about your most challenging project mentioned in your resume. What was your role and what did you learn?",
-      "What technical skills from your resume are you most confident in? Can you give an example of how you've used them?",
-      "Describe a time you had to solve a complex problem. What approach did you take?",
-      "Looking at your resume, which project are you most proud of and why?",
-      "How do you stay updated with new technologies in your field?"
-    ];
-    
-    res.json({ questions: fallbackQuestions });
+    console.error("Start interview error:", err);
+    res.status(500).json({ error: "Failed to start interview" });
   }
 });
 
