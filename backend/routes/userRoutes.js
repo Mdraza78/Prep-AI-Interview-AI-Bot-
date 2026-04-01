@@ -65,7 +65,7 @@ async function generateInterviewQuestion(prompt) {
 // Middleware for JWT authentication
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) return res.status(401).json({ error: 'Missing token' });
 
@@ -95,7 +95,6 @@ router.post('/upload-resume', upload.single('resume'), async (req, res) => {
 });
 
 // User profile fetch route
-// User profile fetch route
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -108,7 +107,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       phone: user.phone || '',
       bio: user.bio || '',
       skills: user.skills || [],
-      imageUrl: user.profilePic || '', // <-- frontend gets as imageUrl
+      imageUrl: user.profilePic || '',
     });
   } catch (err) {
     console.error('Failed to fetch profile:', err);
@@ -116,12 +115,11 @@ router.get('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Register route accepts extended fields
+// Register route
 router.post('/register', async (req, res) => {
   const { name, email, password, phone = '', bio = '', skills = '' } = req.body;
 
   try {
-    // Validate required
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email and password are required' });
     }
@@ -129,10 +127,8 @@ router.post('/register', async (req, res) => {
     const existing = await User.findOne({ email });
     if (existing) return res.status(409).json({ error: 'User already exists' });
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Process skills string into array
     let skillsArray = [];
     if (typeof skills === 'string' && skills.trim().length > 0) {
       skillsArray = skills.split(',').map(s => s.trim()).filter(Boolean);
@@ -140,7 +136,6 @@ router.post('/register', async (req, res) => {
       skillsArray = skills.map(s => s.trim()).filter(Boolean);
     }
 
-    // Create and save user
     await User.create({
       name: name.trim(),
       email: email.trim().toLowerCase(),
@@ -175,10 +170,9 @@ router.post('/login', async (req, res) => {
       { expiresIn: '2h' }
     );
 
-    // Return userId explicitly here
     res.json({
       token,
-      userId: user._id.toString(), // add this line
+      userId: user._id.toString(),
       name: user.name,
       email: user.email,
       phone: user.phone,
@@ -190,6 +184,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Evaluate test route - AI powered (UPDATED VERSION)
 router.post('/evaluate-test', authenticateToken, async (req, res) => {
   try {
     const { resumeText, questions, answers } = req.body;
@@ -391,12 +386,12 @@ Now evaluate this answer:
   }
 });
 
-// Add after other routes, before module.exports
+// Get user results
 router.get('/results', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const results = await TestResult.find({ userId })
-      .sort({ createdAt: -1 }); // most recent first
+      .sort({ createdAt: -1 });
 
     res.json({ results });
   } catch (err) {
@@ -405,8 +400,7 @@ router.get('/results', authenticateToken, async (req, res) => {
   }
 });
 
-// Leaderboard API: GET /api/user/leaderboard
-// Leaderboard API: GET /api/user/leaderboard
+// Leaderboard API
 router.get('/leaderboard', async (req, res) => {
   try {
     const results = await TestResult.aggregate([
@@ -414,9 +408,9 @@ router.get('/leaderboard', async (req, res) => {
         $group: {
           _id: "$userId",
           totalPoints: { $sum: "$totalScore" },
-          attempts: { $sum: 1 },                        // ✅ Count attempts
-          averageScore: { $avg: "$totalScore" },        // ✅ Average score
-          bestScore: { $max: "$totalScore" }            // ✅ Best score
+          attempts: { $sum: 1 },
+          averageScore: { $avg: "$totalScore" },
+          bestScore: { $max: "$totalScore" }
         }
       },
       { $sort: { totalPoints: -1 } },
@@ -437,7 +431,7 @@ router.get('/leaderboard', async (req, res) => {
           totalPoints: 1,
           attempts: 1,
           bestScore: 1,
-          averageScore: { $round: ["$averageScore", 2] } // Rounds average
+          averageScore: { $round: ["$averageScore", 2] }
         }
       },
       { $limit: 100 }
@@ -449,21 +443,12 @@ router.get('/leaderboard', async (req, res) => {
   }
 });
 
-
-
-// PATCH /profile to update user data
+// Update profile
 router.patch('/profile', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const {
-      name,
-      phone = '',
-      bio = '',
-      skills = [],
-      imageUrl = ''
-    } = req.body;
+    const { name, phone = '', bio = '', skills = [], imageUrl = '' } = req.body;
     
-    // Sanitize and convert skills if received as string
     let newSkills = [];
     if (Array.isArray(skills)) {
       newSkills = skills.map(s => s.trim()).filter(Boolean);
@@ -471,16 +456,14 @@ router.patch('/profile', authenticateToken, async (req, res) => {
       newSkills = skills.split(',').map(s => s.trim()).filter(Boolean);
     }
 
-    // Prepare update object
     const updateData = {
       name: name?.trim() || '',
       phone: phone?.trim() || '',
       bio: bio?.trim() || '',
       skills: newSkills,
-      profilePic: imageUrl,    // <<<<<<<<<<<<
+      profilePic: imageUrl,
     };
 
-    // Remove fields with undefined values to avoid overwriting
     Object.keys(updateData).forEach(key => {
       if (typeof updateData[key] === "undefined") delete updateData[key];
     });
@@ -507,7 +490,7 @@ router.patch('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-
+// Start interview - generate questions
 router.post('/start-interview', authenticateToken, async (req, res) => {
   try {
     const { resumeText } = req.body;
@@ -515,7 +498,6 @@ router.post('/start-interview', authenticateToken, async (req, res) => {
 
     // Improved keyword extraction
     const extractKeywords = (text) => {
-      // Remove common words and extract meaningful terms
       const commonWords = new Set([
         'the', 'and', 'for', 'with', 'from', 'this', 'that', 'have', 'was', 'were',
         'been', 'are', 'has', 'had', 'will', 'would', 'should', 'could', 'about',
@@ -523,7 +505,6 @@ router.post('/start-interview', authenticateToken, async (req, res) => {
         'your', 'you', 'our', 'can', 'more', 'very', 'just', 'also', 'than', 'then'
       ]);
       
-      // Extract technical keywords (common in tech resumes)
       const techKeywords = [
         'javascript', 'react', 'node', 'python', 'java', 'sql', 'mongodb', 'express',
         'html', 'css', 'typescript', 'aws', 'docker', 'kubernetes', 'git', 'github',
@@ -535,13 +516,11 @@ router.post('/start-interview', authenticateToken, async (req, res) => {
       
       words.forEach(word => {
         if (word.length > 2 && !commonWords.has(word)) {
-          // Prioritize technical keywords
           const weight = techKeywords.includes(word) ? 3 : 1;
           wordFreq[word] = (wordFreq[word] || 0) + weight;
         }
       });
       
-      // Sort by frequency and return top keywords
       return Object.entries(wordFreq)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 15)
@@ -551,42 +530,34 @@ router.post('/start-interview', authenticateToken, async (req, res) => {
     const keywords = extractKeywords(resumeText);
     console.log("🔍 Extracted keywords:", keywords);
 
-    // Get the main technology/focus from resume
     const mainTech = keywords[0] || 'software development';
     const secondaryTech = keywords[1] || 'technical projects';
-    const tertiaryTech = keywords[2] || 'problem solving';
 
-    // Create specific question prompts based on resume content
     const questionPrompts = [
-      // Technical Depth Question
       `Based on this resume: "${resumeText.substring(0, 1000)}"
 Generate ONE specific technical interview question about ${mainTech} that tests deep understanding.
 Make it challenging but fair for someone with the experience shown in the resume.
 Question should be specific to ${mainTech} concepts or implementation.
 Return ONLY the question text.`,
 
-      // Behavioral/Experience Question
       `Based on this resume: "${resumeText.substring(0, 1000)}"
 Generate ONE behavioral interview question asking about their experience with ${secondaryTech}.
 The question should ask them to describe a specific project or situation.
 Make it relevant to the technologies mentioned in the resume.
 Return ONLY the question text.`,
 
-      // Problem-Solving Scenario
       `Based on this resume: "${resumeText.substring(0, 1000)}"
-Generate ONE scenario-based problem-solving question related to ${tertiaryTech}.
+Generate ONE scenario-based problem-solving question related to ${mainTech}.
 The question should present a realistic work challenge they might face.
 Make it specific to their field/technology mentioned in resume.
 Return ONLY the question text.`,
 
-      // System Design/Architecture Question
       `Based on this resume: "${resumeText.substring(0, 1000)}"
 Generate ONE system design or architecture question relevant to ${mainTech}.
 The question should test their ability to design solutions at scale.
 Make it appropriate for their experience level.
 Return ONLY the question text.`,
 
-      // Coding/Technical Implementation Question (This will be typed)
       `Based on this resume: "${resumeText.substring(0, 1000)}"
 Generate ONE specific coding/programming question for ${mainTech}.
 The question should require writing actual code or pseudocode.
@@ -596,7 +567,6 @@ Example format: "Write a function that..." or "Implement a solution for..."
 Return ONLY the question text.`
     ];
 
-    // Generate questions with better error handling
     const questions = [];
     
     for (let i = 0; i < questionPrompts.length; i++) {
@@ -607,8 +577,8 @@ Return ONLY the question text.`
         
         if (question && question.trim().length > 20) {
           const cleanQuestion = question.trim()
-            .replace(/^["']|["']$/g, '') // Remove quotes if present
-            .replace(/^Question\s*\d*[.:]\s*/i, ''); // Remove "Question 1:" prefix
+            .replace(/^["']|["']$/g, '')
+            .replace(/^Question\s*\d*[.:]\s*/i, '');
           
           questions.push(cleanQuestion);
           console.log(`✅ Question ${i + 1} generated: ${cleanQuestion.substring(0, 80)}...`);
@@ -617,7 +587,6 @@ Return ONLY the question text.`
           questions.push(getResumeSpecificFallback(i, keywords, resumeText));
         }
         
-        // Add delay to avoid rate limiting
         if (i < questionPrompts.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 2500));
         }
@@ -627,31 +596,29 @@ Return ONLY the question text.`
       }
     }
 
-    // Ensure we have exactly 5 questions
     while (questions.length < 5) {
       questions.push(getResumeSpecificFallback(questions.length, keywords, resumeText));
     }
 
-    console.log("✅ All questions generated:", questions.map((q, i) => `${i + 1}. ${q.substring(0, 60)}...`));
+    console.log("✅ All questions generated");
     res.json({ questions });
 
   } catch (err) {
     console.error('❌ Interview Generation Error:', err);
     
-    // Smart fallback based on common resume terms
     const fallbackQuestions = [
       "Based on your resume, walk me through your most challenging technical project. What specific technologies did you use and what problems did you solve?",
       "Describe a situation where you had to learn a new technology quickly for a project. How did you approach it and what was the outcome?",
       "How do you ensure code quality and maintainability in your projects? Give examples from your experience.",
       "Tell me about a time you had to debug a complex issue. What was your systematic approach to finding and fixing it?",
-      `Write a function that demonstrates your understanding of ${keywords[0] || 'core programming concepts'}. Explain your approach and time complexity.`
+      "Write a function that demonstrates your understanding of core programming concepts. Explain your approach and time complexity."
     ];
     
     res.json({ questions: fallbackQuestions });
   }
 });
 
-// Improved fallback question generator
+// Helper function for fallback questions
 function getResumeSpecificFallback(index, keywords, resumeText) {
   const mainTech = keywords[0] || 'your primary technology';
   const secondaryTech = keywords[1] || 'key skills';
@@ -661,22 +628,10 @@ function getResumeSpecificFallback(index, keywords, resumeText) {
     `Describe a project where you used ${secondaryTech} to solve a real-world problem. What was your role and what challenges did you face?`,
     `How would you approach optimizing a ${mainTech} application for better performance? What metrics would you track?`,
     `Tell me about a time you had to collaborate with a team on a technical project. What was your contribution and what did you learn?`,
-    `Write a solution for: Given [a problem related to ${mainTech}], how would you implement it? Consider edge cases and efficiency.`
+    `Write a solution for: Given a problem related to ${mainTech}, how would you implement it? Consider edge cases and efficiency.`
   ];
   
   return fallbacks[index % fallbacks.length];
 }
 
-// Helper function for fallback questions
-function getFallbackQuestion(index, keywords) {
-  const fallbacks = [
-    `What experience do you have with ${keywords[0] || 'key technologies'} mentioned in your resume?`,
-    `Describe a project where you used ${keywords[1] || 'your skills'} to solve a real-world problem.`,
-    `How would you approach learning a new ${keywords[2] || 'technology'} quickly for a project?`,
-    `Tell me about a time you faced a significant challenge while working with ${keywords[3] || 'a team'}.`,
-    `Explain ${keywords[4] || 'a technical concept'} as if you were teaching it to a junior developer.`
-  ];
-  
-  return fallbacks[index % fallbacks.length];
-}
 module.exports = router;
