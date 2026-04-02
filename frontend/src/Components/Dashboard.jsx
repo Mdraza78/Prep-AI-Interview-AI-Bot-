@@ -62,10 +62,16 @@ export default function Dashboard() {
       })
         .then((res) => res.json())
         .then((data) => {
-          if (data.text) {
-            localStorage.setItem("resumeText", data.text);
-          }
-        })
+  if (data.text) {
+    // Clear old resume first
+    localStorage.removeItem("resumeText");
+    console.log("%c🗑️ Old resume text cleared from localStorage", "color: #ff6b6b");
+    
+    // Save new resume
+    localStorage.setItem("resumeText", data.text);
+    console.log(`%c✅ New resume saved: ${data.text.length} characters`, "color: #6bcb77");
+  }
+})
         .catch((err) => console.error("Upload failed:", err));
     }
   };
