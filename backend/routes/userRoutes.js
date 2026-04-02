@@ -16,101 +16,39 @@ function logWithTimestamp(...args) {
   console.log(`[${timestamp}]`, ...args);
 }
 
-// Utility function for Gemini API calls with retry logic
-async function callGeminiAPI(prompt, retryCount = 0, maxRetries = 3) {
-  if (!GEMINI_API_KEY) {
-    logWithTimestamp('❌ ERROR: GEMINI_API_KEY is not set in environment variables');
-    throw new Error('GEMINI_API_KEY is not configured');
-  }
-  
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-  
+async function callGeminiAPI(prompt, isJsonResponse = false, retryCount = 0, maxRetries = 3) {
+  if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
+
+  // Updated to stable v1 and 1.5-flash for 2026 Free Tier
+  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
   const requestBody = {
-    contents: [{ 
-      parts: [{ 
-        text: prompt 
-      }] 
-    }],
+    contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
-      maxOutputTokens: 1000,
+      maxOutputTokens: 1500,
       temperature: 0.7,
-      topP: 0.9,
-      topK: 40
+      // This tells the API to strictly return valid JSON
+      responseMimeType: isJsonResponse ? "application/json" : "text/plain"
     }
   };
-  
-  logWithTimestamp(`📡 Calling Gemini API (Attempt ${retryCount + 1}/${maxRetries + 1})...`);
-  
+
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
-    
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
     });
-    
-    clearTimeout(timeoutId);
-    
-    logWithTimestamp(`📊 API Response Status: ${response.status} ${response.statusText}`);
-    
-    // Handle rate limiting with exponential backoff
-    if (response.status === 429) {
-      if (retryCount < maxRetries) {
-        const delay = Math.min(2000 * Math.pow(2, retryCount) + Math.random() * 1000, 15000);
-        logWithTimestamp(`⚠️ Rate limit hit. Retry ${retryCount + 1}/${maxRetries} in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return callGeminiAPI(prompt, retryCount + 1, maxRetries);
-      } else {
-        throw new Error('Rate limit exceeded after multiple retries');
-      }
+
+    if (response.status === 429 && retryCount < maxRetries) {
+      const delay = Math.min(2000 * Math.pow(2, retryCount), 10000);
+      await new Promise(res => setTimeout(res, delay));
+      return callGeminiAPI(prompt, isJsonResponse, retryCount + 1);
     }
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      logWithTimestamp(`❌ API Error Response (${response.status}):`, errorText);
-      throw new Error(`API Error ${response.status}: ${errorText.substring(0, 200)}`);
-    }
-    
+
     const data = await response.json();
-    
-    if (!data.candidates || !data.candidates[0]) {
-      logWithTimestamp(`❌ No candidates in response`);
-      throw new Error('No candidates in API response');
-    }
-    
-    if (!data.candidates[0].content || !data.candidates[0].content.parts) {
-      logWithTimestamp(`❌ Invalid content structure`);
-      throw new Error('Invalid content structure in API response');
-    }
-    
-    const generatedText = data.candidates[0].content.parts[0].text;
-    
-    if (!generatedText || generatedText.trim().length === 0) {
-      logWithTimestamp(`❌ Empty response from API`);
-      throw new Error('Empty response from API');
-    }
-    
-    logWithTimestamp(`✅ API Response Success (${generatedText.length} chars)`);
-    return generatedText.trim();
-    
+    return data.candidates[0].content.parts[0].text;
   } catch (error) {
-    logWithTimestamp(`❌ API Call Error:`, error.message);
-    
-    if (retryCount < maxRetries && 
-        (error.name === 'AbortError' || 
-         error.message.includes('network') || 
-         error.message.includes('fetch') ||
-         error.message.includes('timeout'))) {
-      const delay = 2000 * Math.pow(2, retryCount);
-      logWithTimestamp(`⚠️ Retrying in ${delay}ms... (${retryCount + 1}/${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return callGeminiAPI(prompt, retryCount + 1, maxRetries);
-    }
+    console.error("API Call Error:", error.message);
     throw error;
   }
 }
@@ -279,169 +217,79 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Evaluate test route - BATCH ALL QUESTIONS IN ONE API CALL
+// Evaluate all questions in one batch call
 router.post('/evaluate-test', authenticateToken, async (req, res) => {
   try {
     const { resumeText, questions, answers } = req.body;
-    
-    if (!resumeText || !questions || !answers) {
-      return res.status(400).json({ error: "Missing data." });
-    }
-
-    if (questions.length !== answers.length) {
-      return res.status(400).json({ error: "Questions and answers count mismatch" });
-    }
-
     const userId = req.user.userId;
 
-    if (!process.env.GEMINI_API_KEY) {
-      console.error("❌ GEMINI_API_KEY is missing");
-      return res.status(500).json({ error: "AI service not configured" });
+    if (!resumeText || !questions || !answers || questions.length !== answers.length) {
+      return res.status(400).json({ error: "Invalid input data" });
     }
 
-    logWithTimestamp(`📊 Evaluating ${questions.length} questions in a single batch request...`);
+    logWithTimestamp(`📊 Starting batch evaluation for User: ${userId}`);
 
-    // Create a single prompt that asks for evaluation of all questions at once
-    let evaluationPrompt = `You are an experienced technical interviewer. Evaluate ALL the following interview answers based on the candidate's resume.
+    const evaluationPrompt = `You are an expert technical interviewer. 
+    Evaluate the following interview performance based on the candidate's resume.
 
-CANDIDATE'S RESUME:
-${resumeText.substring(0, 2500)}
+    CANDIDATE'S RESUME:
+    ${resumeText.substring(0, 2500)}
 
-Here are the interview questions and the candidate's answers:
+    INTERVIEW DATA:
+    ${questions.map((q, i) => `[QUESTION ${i+1}]: ${q}\n[ANSWER ${i+1}]: ${answers[i] || "No answer provided"}`).join('\n\n')}
 
-`;
+    EVALUATION REQUIREMENTS:
+    1. Score each answer from 0 to 20 based on accuracy, technical depth, and communication.
+    2. Provide 2 sentences of constructive feedback per question.
+    3. Calculate a totalScore (sum of all individual scores).
 
-    // Add all questions and answers to the prompt
-    for (let i = 0; i < questions.length; i++) {
-      evaluationPrompt += `
-QUESTION ${i + 1}:
-${questions[i]}
-
-CANDIDATE'S ANSWER ${i + 1}:
-${answers[i] || "No answer given"}
-
----
-`;
-    }
-
-    evaluationPrompt += `
-IMPORTANT: Provide your evaluation in the following EXACT format for EACH question:
-
-QUESTION 1:
-SCORE: [number 0-20]
-FEEDBACK: [2-3 sentences of constructive feedback]
-
-QUESTION 2:
-SCORE: [number 0-20]
-FEEDBACK: [2-3 sentences of constructive feedback]
-
-QUESTION 3:
-SCORE: [number 0-20]
-FEEDBACK: [2-3 sentences of constructive feedback]
-
-QUESTION 4:
-SCORE: [number 0-20]
-FEEDBACK: [2-3 sentences of constructive feedback]
-
-QUESTION 5:
-SCORE: [number 0-20]
-FEEDBACK: [2-3 sentences of constructive feedback]
-
-Provide scores between 0-20 for each question based on relevance, accuracy, completeness, and communication.`;
+    OUTPUT FORMAT:
+    Return ONLY a JSON object with this exact structure:
+    {
+      "totalScore": 85,
+      "evaluations": [
+        { "score": 18, "feedback": "Great explanation of React hooks..." },
+        { "score": 15, "feedback": "Solid logic, but could optimize time complexity..." }
+      ]
+    }`;
 
     try {
-      // Make a single API call for all questions
-      const aiResponse = await callGeminiAPI(evaluationPrompt, 0, 3);
-      
-      logWithTimestamp("✅ Batch evaluation completed");
-      
-      // Parse the response to extract scores and feedback for each question
-      let totalScore = 0;
-      let details = [];
-      
-      for (let i = 1; i <= questions.length; i++) {
-        let numericScore = 12;
-        let feedback = "Your answer has been recorded.";
-        
-        // Extract score for this question
-        const scorePattern = new RegExp(`QUESTION ${i}:\\s*SCORE:\\s*(\\d{1,2})`, 'i');
-        const scoreMatch = aiResponse.match(scorePattern);
-        
-        if (scoreMatch) {
-          numericScore = parseInt(scoreMatch[1], 10);
-          numericScore = Math.min(Math.max(numericScore, 0), 20);
-        }
-        
-        // Extract feedback for this question
-        const feedbackPattern = new RegExp(`QUESTION ${i}:[\\s\\S]*?FEEDBACK:\\s*([^\\n]+(?:\\n(?!QUESTION|SCORE:)[^\\n]+)*)`, 'i');
-        const feedbackMatch = aiResponse.match(feedbackPattern);
-        
-        if (feedbackMatch) {
-          feedback = feedbackMatch[1].trim();
-        }
-        
-        totalScore += numericScore;
-        
-        details.push({
-          question: questions[i - 1],
-          answer: answers[i - 1] || "No answer given",
-          individualScore: numericScore,
-          feedback: feedback
-        });
-        
-        logWithTimestamp(`📝 Question ${i}: Score ${numericScore}/20`);
-      }
-      
-      // Save to database
-      try {
-        const testResult = new TestResult({
-          userId,
-          totalScore,
-          questions: details,
-          createdAt: new Date()
-        });
-        await testResult.save();
-        logWithTimestamp(`✅ Test saved: ${totalScore}/100`);
-      } catch (dbError) {
-        console.error("❌ DB error:", dbError.message);
-      }
-      
+      const aiResponse = await callGeminiAPI(evaluationPrompt, true);
+      const result = JSON.parse(aiResponse);
+
+      // Map the AI response to your database schema
+      const details = result.evaluations.map((evalItem, index) => ({
+        question: questions[index],
+        answer: answers[index] || "No answer given",
+        individualScore: evalItem.score,
+        feedback: evalItem.feedback
+      }));
+
+      // Save to MongoDB
+      const testResult = new TestResult({
+        userId,
+        totalScore: result.totalScore,
+        questions: details,
+        createdAt: new Date()
+      });
+      await testResult.save();
+
+      logWithTimestamp(`✅ Evaluation complete. Score: ${result.totalScore}/100`);
+
       res.json({ 
         success: true,
-        score: totalScore, 
+        score: result.totalScore, 
         details: details
       });
-      
+
     } catch (error) {
-      logWithTimestamp(`❌ AI evaluation error:`, error.message);
-      
-      // Fallback: Provide default scores if AI fails
-      let totalScore = 0;
-      let details = [];
-      
-      for (let i = 0; i < questions.length; i++) {
-        const defaultScore = 15;
-        totalScore += defaultScore;
-        
-        details.push({
-          question: questions[i],
-          answer: answers[i] || "No answer given",
-          individualScore: defaultScore,
-          feedback: "Evaluation temporarily unavailable. Your answers have been recorded and will be evaluated later."
-        });
-      }
-      
-      res.json({ 
-        success: true,
-        score: totalScore, 
-        details: details,
-        warning: "Used fallback evaluation due to AI service issues"
-      });
+      logWithTimestamp(`❌ AI Evaluation error: ${error.message}`);
+      res.status(500).json({ error: "AI evaluation failed" });
     }
 
   } catch (err) {
-    logWithTimestamp(`❌ Error in evaluation:`, err);
-    res.status(500).json({ error: "Failed to evaluate test. Please try again." });
+    logWithTimestamp(`❌ Error in evaluation route:`, err);
+    res.status(500).json({ error: "Server error during evaluation" });
   }
 });
 
@@ -547,138 +395,57 @@ router.patch('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Start interview and generate 5 custom questions
+// Start interview and generate 5 custom questions using JSON mode
 router.post('/start-interview', authenticateToken, async (req, res) => {
   try {
     const { resumeText } = req.body;
     
     if (!resumeText) {
-      logWithTimestamp('❌ No resume text provided');
-      return res.status(400).json({ 
-        error: "Resume text is required",
-        debug: { timestamp: new Date().toISOString() }
-      });
+      return res.status(400).json({ error: "Resume text is required" });
     }
 
-    logWithTimestamp(`📝 Resume received: ${resumeText.length} characters`);
-    logWithTimestamp(`📄 Resume preview: ${resumeText.substring(0, 200)}...`);
+    logWithTimestamp(`📝 Generating questions for resume (${resumeText.length} chars)`);
 
-    if (!process.env.GEMINI_API_KEY) {
-      logWithTimestamp("❌ GEMINI_API_KEY is missing from environment variables");
-      return res.status(500).json({ 
-        error: "AI service not configured",
-        debug: { hasApiKey: false }
-      });
-    }
-
-    const prompt = `You are an expert technical interviewer. Based on the following resume, generate exactly 5 interview questions.
-
-CRITICAL: 
-- Questions must be SPECIFIC to the candidate's skills and experience
-- Make questions challenging and thought-provoking
-- The 5th question MUST be a coding/algorithm question
-- Output ONLY the questions, numbered 1-5
-- No introductory text or explanations
-
-RESUME:
-${resumeText.substring(0, 2500)}
-
-Generate 5 personalized interview questions:`;
-
-    logWithTimestamp("🎯 Sending request to Gemini API...");
+    const prompt = `You are a professional technical recruiter. 
+    Analyze the resume below and generate exactly 5 interview questions.
     
+    CONSTRAINTS:
+    - Questions 1-4: Focus on technical skills, projects, and experience found in the resume.
+    - Question 5: Must be a specific coding, data structure, or algorithmic logic problem.
+    - Questions must be challenging and specific to this candidate.
+
+    OUTPUT FORMAT:
+    You must return ONLY a JSON object with the following structure:
+    {
+      "questions": ["Question 1 text", "Question 2 text", "Question 3 text", "Question 4 text", "Question 5 text"]
+    }
+
+    RESUME CONTENT:
+    ${resumeText.substring(0, 3000)}`;
+
     try {
-      const rawResponse = await callGeminiAPI(prompt, 0, 3);
-      
-      // Log the full response to server console
-      logWithTimestamp("✅ Gemini API Response:");
-      logWithTimestamp("=".repeat(50));
-      logWithTimestamp(rawResponse);
-      logWithTimestamp("=".repeat(50));
-      
-      // Parse questions
-      let questions = [];
-      
-      // Method 1: Split by numbers
-      const lines = rawResponse.split('\n');
-      for (const line of lines) {
-        const match = line.match(/^\d+\.\s*(.+)$/);
-        if (match && match[1].trim().length > 0) {
-          questions.push(match[1].trim());
-        }
+      // Use 'true' to enable JSON response mode in callGeminiAPI
+      const rawResponse = await callGeminiAPI(prompt, true);
+      const parsedData = JSON.parse(rawResponse);
+
+      if (!parsedData.questions || parsedData.questions.length !== 5) {
+        throw new Error("Invalid question count in AI response");
       }
-      
-      // Method 2: If not enough, try alternative parsing
-      if (questions.length < 5) {
-        const numberMatches = rawResponse.match(/\d+\.\s*([^\n]+)/g);
-        if (numberMatches) {
-          questions = numberMatches.map(q => q.replace(/^\d+\.\s*/, '').trim());
-        }
-      }
-      
-      // Method 3: If still not enough, try splitting by newlines
-      if (questions.length < 5) {
-        const textWithoutNumbers = rawResponse.replace(/\d+\./g, '|').split('|');
-        for (const text of textWithoutNumbers) {
-          const trimmed = text.trim();
-          if (trimmed.length > 10 && trimmed.length < 300 && questions.length < 5) {
-            questions.push(trimmed);
-          }
-        }
-      }
-      
-      // Ensure we have exactly 5 questions
-      if (questions.length !== 5) {
-        logWithTimestamp(`⚠️ Expected 5 questions, got ${questions.length}. Using fallback.`);
-        questions = generateResumeBasedQuestions(resumeText);
-      }
-      
-      // Clean up questions
-      questions = questions.slice(0, 5).map(q => q.trim());
-      
-      logWithTimestamp(`✅ Generated ${questions.length} questions`);
-      questions.forEach((q, i) => {
-        logWithTimestamp(`   ${i + 1}. ${q.substring(0, 100)}`);
-      });
-      
-      // Send response with debug info
+
       res.json({ 
-        questions: questions,
-        debug: {
-          success: true,
-          geminiResponse: rawResponse,
-          parsedCount: questions.length,
-          timestamp: new Date().toISOString(),
-          apiKeyPresent: !!process.env.GEMINI_API_KEY
-        }
+        questions: parsedData.questions,
+        success: true 
       });
-      
+
     } catch (error) {
-      logWithTimestamp(`❌ AI generation error:`, error.message);
-      
-      // Send fallback questions with error info
-      const fallbackQuestions = generateResumeBasedQuestions(resumeText);
-      
-      res.json({ 
-        questions: fallbackQuestions,
-        debug: {
-          success: false,
-          error: error.message,
-          fallback: true,
-          timestamp: new Date().toISOString()
-        }
-      });
+      logWithTimestamp(`⚠️ AI Generation failed, using fallback: ${error.message}`);
+      const fallback = generateResumeBasedQuestions(resumeText);
+      res.json({ questions: fallback, success: true, isFallback: true });
     }
     
   } catch (err) {
     logWithTimestamp(`❌ Start interview error:`, err);
-    res.status(500).json({ 
-      error: "Failed to start interview. Please try again.",
-      debug: {
-        message: err.message,
-        timestamp: new Date().toISOString()
-      }
-    });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
