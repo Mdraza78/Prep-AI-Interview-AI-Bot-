@@ -19,8 +19,8 @@ function logWithTimestamp(...args) {
 async function callGeminiAPI(prompt, isJsonResponse = false, retryCount = 0, maxRetries = 3) {
   if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
 
-const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
+// Use the stable versioned model
+const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 const requestBody = {
   contents: [{ parts: [{ text: prompt }] }],
   generationConfig: {
