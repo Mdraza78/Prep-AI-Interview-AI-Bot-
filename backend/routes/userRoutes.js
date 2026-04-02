@@ -19,17 +19,15 @@ function logWithTimestamp(...args) {
 async function callGeminiAPI(prompt, isJsonResponse = false, retryCount = 0, maxRetries = 3) {
   if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
 
-  // Use the specific 1.5-flash model endpoint
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-  const requestBody = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      maxOutputTokens: 1500,
-      temperature: 0.7,
-      responseMimeType: isJsonResponse ? "application/json" : "text/plain"
-    }
-  };
+const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const requestBody = {
+  contents: [{ parts: [{ text: prompt }] }],
+  generationConfig: {
+    maxOutputTokens: 1500,
+    temperature: 0.7,
+    responseMimeType: isJsonResponse ? "application/json" : "text/plain"
+  }
+};
 
   try {
     const response = await fetch(url, {
