@@ -19,15 +19,14 @@ function logWithTimestamp(...args) {
 async function callGeminiAPI(prompt, isJsonResponse = false, retryCount = 0, maxRetries = 3) {
   if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
 
-  // Updated to stable v1 and 1.5-flash for 2026 Free Tier
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  // Use the specific 1.5-flash model endpoint
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
   const requestBody = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 1500,
       temperature: 0.7,
-      // This tells the API to strictly return valid JSON
       responseMimeType: isJsonResponse ? "application/json" : "text/plain"
     }
   };
@@ -39,16 +38,28 @@ async function callGeminiAPI(prompt, isJsonResponse = false, retryCount = 0, max
       body: JSON.stringify(requestBody)
     });
 
-    if (response.status === 429 && retryCount < maxRetries) {
+    const data = await response.json();
+
+    // 1. Check if the API returned an error object
+    if (data.error) {
+      console.error("Gemini API Error Details:", data.error);
+      throw new Error(`Gemini API Error: ${data.error.message}`);
+    }
+
+    // 2. Safely check if candidates exist before accessing [0]
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+      console.error("Unexpected API Structure:", JSON.stringify(data));
+      throw new Error("Invalid response structure from Gemini");
+    }
+
+    return data.candidates[0].content.parts[0].text;
+  } catch (error) {
+    // Handle Rate Limiting (429)
+    if (error.message.includes('429') && retryCount < maxRetries) {
       const delay = Math.min(2000 * Math.pow(2, retryCount), 10000);
       await new Promise(res => setTimeout(res, delay));
       return callGeminiAPI(prompt, isJsonResponse, retryCount + 1);
     }
-
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text;
-  } catch (error) {
-    console.error("API Call Error:", error.message);
     throw error;
   }
 }
