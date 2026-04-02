@@ -24,9 +24,10 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
 const requestBody = {
   contents: [{ parts: [{ text: prompt }] }],
   generationConfig: {
-    maxOutputTokens: 1500,
+    maxOutputTokens: 8192,
     temperature: 0.7,
-    responseMimeType: isJsonResponse ? "application/json" : "text/plain"
+    responseMimeType: isJsonResponse ? "application/json" : "text/plain",
+    thinkingConfig: { thinkingBudget: 0 }
   }
 };
 
